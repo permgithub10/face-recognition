@@ -167,7 +167,7 @@
         return detection.descriptor;
     }
 
-    // ใช้ XMLHttpRequest เพื่อหลีกเลี่ยงปัญหา Failed to fetch
+    // ✅ แก้ไข: ไม่แสดง popup error อีกต่อไป (เฉพาะ success เท่านั้นที่ popup)
     async function registerFace() {
         const name = regNameInput.value.trim();
         if (!name) {
@@ -207,27 +207,27 @@
                 try {
                     const result = JSON.parse(xhr.responseText);
                     if (result.success) {
-                        // ✅ Popup ตามที่ต้องการ
+                        // ✅ เฉพาะสำเร็จเท่านั้นถึงจะมี popup
                         alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
                         regStatusDiv.innerText = "✔️ บันทึกสำเร็จ! สามารถลงทะเบียนเพิ่มหรือกลับหน้าแรก";
                         regNameInput.value = "";
                     } else {
-                        alert("❌ บันทึกไม่สำเร็จ: " + (result.message || "เกิดข้อผิดพลาด"));
-                        regStatusDiv.innerText = "❌ บันทึกไม่สำเร็จ";
+                        // ❌ ไม่สำเร็จ: ไม่ popup แจ้งเฉพาะใน status div
+                        regStatusDiv.innerText = "❌ บันทึกไม่สำเร็จ: " + (result.message || "เกิดข้อผิดพลาด");
                     }
                 } catch (e) {
-                    alert("⚠️ ข้อมูลตอบกลับไม่ถูกต้อง (ไม่ใช่ JSON)");
-                    regStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับผิดพลาด";
+                    // response ไม่ใช่ JSON: ไม่ popup
+                    regStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับไม่ถูกต้อง (ไม่ใช่ JSON)";
                 }
             } else {
-                alert(`🌐 การเชื่อมต่อล้มเหลว (HTTP ${xhr.status})`);
-                regStatusDiv.innerText = "🌐 เชื่อมต่อเซิร์ฟเวอร์ไม่ได้";
+                // ❌ HTTP status ไม่ใช่ 200: ไม่ popup
+                regStatusDiv.innerText = `🌐 การเชื่อมต่อล้มเหลว (HTTP ${xhr.status})`;
             }
         };
         
         xhr.onerror = function() {
-            alert("🌐 การเชื่อมต่อล้มเหลว (Failed to send)");
-            regStatusDiv.innerText = "🌐 เชื่อมต่อเซิร์ฟเวอร์ไม่ได้";
+            // ❌ network error: ไม่ popup อีกต่อไป (แก้ตามที่ต้องการ)
+            regStatusDiv.innerText = "🌐 ไม่สามารถส่งข้อมูลได้ (network error)";
         };
         
         xhr.send(formData);
