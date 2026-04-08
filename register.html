@@ -167,7 +167,6 @@
         return detection.descriptor;
     }
 
-    // ✅ แก้ไข: ไม่แสดง popup error อีกต่อไป (เฉพาะ success เท่านั้นที่ popup)
     async function registerFace() {
         const name = regNameInput.value.trim();
         if (!name) {
@@ -207,27 +206,28 @@
                 try {
                     const result = JSON.parse(xhr.responseText);
                     if (result.success) {
-                        // ✅ เฉพาะสำเร็จเท่านั้นถึงจะมี popup
+                        // ✅ สำเร็จ: แสดง popup ตามต้องการ
                         alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
                         regStatusDiv.innerText = "✔️ บันทึกสำเร็จ! สามารถลงทะเบียนเพิ่มหรือกลับหน้าแรก";
                         regNameInput.value = "";
                     } else {
-                        // ❌ ไม่สำเร็จ: ไม่ popup แจ้งเฉพาะใน status div
+                        // กรณี success = false: ไม่มี popup error
                         regStatusDiv.innerText = "❌ บันทึกไม่สำเร็จ: " + (result.message || "เกิดข้อผิดพลาด");
                     }
                 } catch (e) {
-                    // response ไม่ใช่ JSON: ไม่ popup
+                    // JSON parse error: ไม่มี popup
                     regStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับไม่ถูกต้อง (ไม่ใช่ JSON)";
                 }
             } else {
-                // ❌ HTTP status ไม่ใช่ 200: ไม่ popup
+                // HTTP status ไม่ใช่ 200: ไม่มี popup error
                 regStatusDiv.innerText = `🌐 การเชื่อมต่อล้มเหลว (HTTP ${xhr.status})`;
             }
         };
         
+        // ✅ ตามข้อ 1: ลบการแจ้งเตือนทั้งหมดใน onerror (ไม่แสดงข้อความใดๆ)
         xhr.onerror = function() {
-            // ❌ network error: ไม่ popup อีกต่อไป (แก้ตามที่ต้องการ)
-            regStatusDiv.innerText = "🌐 ไม่สามารถส่งข้อมูลได้ (network error)";
+            // ไม่ทำอะไรเลย -> ไม่มี popup, ไม่เปลี่ยนข้อความใน status
+            // เงียบสนิท
         };
         
         xhr.send(formData);
