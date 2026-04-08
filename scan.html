@@ -106,8 +106,7 @@
 </div>
 
 <script>
-    // 🔁 แก้ไขเป็น URL ของ Apps Script ที่ deploy แล้ว
-    const API_URL = "https://script.google.com/macros/s/AKfycbxYu2nQuMcTIYj5Mlnl8S-5l99LzrDU0fsfYiafTtyJklQjHPgEyqobtuCEBEl08o2P/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycby5NA4JZDM_YBsVGbIg0Ws9CaTDH7f3BWa4GJQXHXa6QX0kr_4GQvaB7cdFkRqqeYbx/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -164,7 +163,6 @@
 
     async function attemptAutoLogin() {
         if (!modelsLoaded || loginSuccess || isProcessing) return;
-        if (!document.body.contains(video)) return;
         isProcessing = true;
         try {
             const descriptor = await getFaceDescriptor();
@@ -179,41 +177,27 @@
             formData.append('action', 'login');
             formData.append('descriptor', JSON.stringify(descriptorArr));
             
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', API_URL);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    try {
-                        const result = JSON.parse(xhr.responseText);
-                        if (result.success) {
-                            loginSuccess = true;
-                            loginStatusDiv.innerHTML = `🎉 ยินดีต้อนรับ ${result.name} | ล็อกอินสำเร็จ!`;
-                            if (autoLoginInterval) clearInterval(autoLoginInterval);
-                            const scanLine = document.getElementById('scanLine');
-                            if (scanLine) scanLine.style.display = 'none';
-                            alert(`✅ ล็อกอินสำเร็จ! คุณ ${result.name}`);
-                        } else {
-                            loginStatusDiv.innerText = "❌ " + (result.message || "ไม่พบใบหน้าที่ลงทะเบียน");
-                        }
-                    } catch(e) {
-                        loginStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับผิดพลาด";
-                    }
-                } else {
-                    loginStatusDiv.innerText = `🌐 HTTP ${xhr.status}`;
-                }
-                isProcessing = false;
-            };
-            xhr.onerror = function() {
-                loginStatusDiv.innerText = "🌐 การเชื่อมต่อล้มเหลว";
-                isProcessing = false;
-            };
-            xhr.send(formData);
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+            const result = await response.json();
+            if (result.success) {
+                loginSuccess = true;
+                loginStatusDiv.innerHTML = `🎉 ยินดีต้อนรับ ${result.name} | ล็อกอินสำเร็จ!`;
+                if (autoLoginInterval) clearInterval(autoLoginInterval);
+                const scanLine = document.getElementById('scanLine');
+                if (scanLine) scanLine.style.display = 'none';
+                alert(`✅ ล็อกอินสำเร็จ! คุณ ${result.name}`);
+            } else {
+                loginStatusDiv.innerText = "❌ " + (result.message || "ไม่พบใบหน้าที่ลงทะเบียน");
+            }
         } catch(err) {
             console.error(err);
-            loginStatusDiv.innerText = "⚠️ ข้อผิดพลาดในการตรวจจับ";
-            isProcessing = false;
+            loginStatusDiv.innerText = "🌐 การเชื่อมต่อล้มเหลว";
         }
+        isProcessing = false;
     }
 
     function startAutoLoginLoop() {
@@ -222,12 +206,14 @@
             attemptAutoLogin();
         }, 2800);
     }
+
     function stopAutoLoginLoop() {
         if (autoLoginInterval) {
             clearInterval(autoLoginInterval);
             autoLoginInterval = null;
         }
     }
+
     function goHome() {
         stopAutoLoginLoop();
         stopCamera();
