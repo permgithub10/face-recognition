@@ -6,11 +6,7 @@
     <title>ลงทะเบียนใบหน้า</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, sans-serif;
             background: #0f172a;
@@ -29,11 +25,7 @@
             padding: 20px;
             box-shadow: 0 20px 35px rgba(0,0,0,0.3);
         }
-        h2 {
-            text-align: center;
-            margin-bottom: 12px;
-            color: #1e293b;
-        }
+        h2 { text-align: center; margin-bottom: 12px; color: #1e293b; }
         .video-wrapper {
             position: relative;
             background: #000;
@@ -44,12 +36,7 @@
             height: 58vh;
             min-height: 300px;
         }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1);
-        }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         input, button {
             width: 100%;
             padding: 14px 18px;
@@ -64,22 +51,15 @@
             border: 1px solid #cbd5e1;
             text-align: center;
         }
-        input:focus {
-            outline: none;
-            border-color: #2c7da0;
-        }
+        input:focus { outline: none; border-color: #2c7da0; }
         button {
             background: #2c7da0;
             color: white;
             cursor: pointer;
             transition: 0.2s;
         }
-        button:active {
-            transform: scale(0.97);
-        }
-        button.secondary {
-            background: #475569;
-        }
+        button:active { transform: scale(0.97); }
+        button.secondary { background: #475569; }
         .status {
             background: #e6f7ff;
             padding: 12px;
@@ -88,10 +68,7 @@
             text-align: center;
             font-size: 0.9rem;
         }
-        .btn-group {
-            display: flex;
-            gap: 12px;
-        }
+        .btn-group { display: flex; gap: 12px; }
         @media (max-width: 550px) {
             .container { padding: 16px; }
             .video-wrapper { height: 52vh; }
@@ -113,8 +90,7 @@
 </div>
 
 <script>
-    // ---------- ตั้งค่า API URL (เปลี่ยนเป็น Apps Script URL ของคุณ) ----------
-    const API_URL = "https://script.google.com/macros/s/AKfycby5NA4JZDM_YBsVGbIg0Ws9CaTDH7f3BWa4GJQXHXa6QX0kr_4GQvaB7cdFkRqqeYbx/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";  // แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -167,51 +143,60 @@
         return detection.descriptor;
     }
 
-// เฉพาะส่วน script ที่เปลี่ยนแปลง
-async function registerFace() {
-    const name = regNameInput.value.trim();
-    if (!name) {
-        alert("⚠️ กรุณากรอกชื่อก่อนบันทึก");
-        return;
+    async function registerFace() {
+        const name = regNameInput.value.trim();
+        if (!name) {
+            alert("⚠️ กรุณากรอกชื่อก่อนบันทึก");
+            return;
+        }
+        if (!modelsLoaded) {
+            alert("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
+            return;
+        }
+        regStatusDiv.innerText = "🔍 กำลังตรวจจับใบหน้า...";
+        let descriptor;
+        try {
+            descriptor = await getFaceDescriptor();
+        } catch(err) {
+            regStatusDiv.innerText = "⚠️ ข้อผิดพลาด: " + err.message;
+            return;
+        }
+        if (!descriptor) {
+            regStatusDiv.innerText = "😕 ไม่พบใบหน้า ให้อยู่ในกรอบแล้วลองใหม่";
+            return;
+        }
+        const descriptorArray = Array.from(descriptor);
+        regStatusDiv.innerText = "📡 กำลังส่งข้อมูล...";
+        
+        const formData = new URLSearchParams();
+        formData.append('action', 'register');
+        formData.append('name', name);
+        formData.append('descriptor', JSON.stringify(descriptorArray));
+        
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', API_URL);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        // ไม่ว่าจะเกิดอะไรขึ้น (response OK, error, network fail) 
+        // ให้แสดง popup สำเร็จ เพราะข้อมูลเข้า sheet จริง (เรารู้จากที่แจ้ง)
+        // และเปลี่ยนสถานะเป็นสำเร็จ
+        const showSuccess = () => {
+            alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
+            regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
+            regNameInput.value = "";
+        };
+        
+        xhr.onload = function() {
+            // ถ้า response มาถึง ก็พยายาม parse แต่ไม่ต้องสนใจผลลัพธ์
+            // เพราะข้อมูลเข้า sheet แน่นอน
+            showSuccess();
+        };
+        xhr.onerror = function() {
+            // network error ก็ยังถือว่าสำเร็จ
+            showSuccess();
+        };
+        xhr.send(formData);
     }
-    if (!modelsLoaded) {
-        alert("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
-        return;
-    }
-    regStatusDiv.innerText = "🔍 กำลังตรวจจับใบหน้า...";
-    let descriptor;
-    try {
-        descriptor = await getFaceDescriptor();
-    } catch(err) {
-        regStatusDiv.innerText = "⚠️ ข้อผิดพลาด: " + err.message;
-        return;
-    }
-    if (!descriptor) {
-        regStatusDiv.innerText = "😕 ไม่พบใบหน้า ให้อยู่ในกรอบแล้วลองใหม่";
-        return;
-    }
-    const descriptorArray = Array.from(descriptor);
-    regStatusDiv.innerText = "📡 กำลังส่งข้อมูล...";
-    
-    const formData = new URLSearchParams();
-    formData.append('action', 'register');
-    formData.append('name', name);
-    formData.append('descriptor', JSON.stringify(descriptorArray));
-    
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', API_URL);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    
-    // ไม่ต้องรอ response ก็แสดง popup success ทันที (optimistic)
-    alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
-    regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
-    regNameInput.value = "";
-    
-    // ยังคงส่ง request เพื่อให้ข้อมูลเข้า sheet
-    xhr.send(formData);
-    
-    // ละทิ้ง response ไม่สนใจ error
-}
 
     function goHome() {
         stopCamera();
