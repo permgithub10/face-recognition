@@ -206,28 +206,28 @@
                 try {
                     const result = JSON.parse(xhr.responseText);
                     if (result.success) {
-                        // ✅ สำเร็จ: แสดง popup ตามต้องการ
+                        // ✅ แจ้งสำเร็จตามที่ต้องการ
                         alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
                         regStatusDiv.innerText = "✔️ บันทึกสำเร็จ! สามารถลงทะเบียนเพิ่มหรือกลับหน้าแรก";
                         regNameInput.value = "";
                     } else {
-                        // กรณี success = false: ไม่มี popup error
+                        // กรณี success = false: ไม่มี alert error
                         regStatusDiv.innerText = "❌ บันทึกไม่สำเร็จ: " + (result.message || "เกิดข้อผิดพลาด");
                     }
                 } catch (e) {
-                    // JSON parse error: ไม่มี popup
+                    // JSON parse error: ไม่มี alert error
                     regStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับไม่ถูกต้อง (ไม่ใช่ JSON)";
                 }
             } else {
-                // HTTP status ไม่ใช่ 200: ไม่มี popup error
+                // HTTP status ไม่ใช่ 200: ไม่มี alert error
                 regStatusDiv.innerText = `🌐 การเชื่อมต่อล้มเหลว (HTTP ${xhr.status})`;
             }
         };
         
-        // ✅ ตามข้อ 1: ลบการแจ้งเตือนทั้งหมดใน onerror (ไม่แสดงข้อความใดๆ)
+        // ✅ ตัดการแจ้งเตือน network error ออกทั้งหมด (ไม่เปลี่ยนข้อความ, ไม่ alert)
         xhr.onerror = function() {
-            // ไม่ทำอะไรเลย -> ไม่มี popup, ไม่เปลี่ยนข้อความใน status
-            // เงียบสนิท
+            // ไม่ทำอะไรเลย -> ผู้ใช้จะไม่เห็น error ใดๆ
+            // ข้อความใน regStatusDiv จะยังคงเป็น "📡 กำลังส่งข้อมูล..."
         };
         
         xhr.send(formData);
