@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>Face Recognition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .card {
+            max-width: 500px;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            border-radius: 48px;
+            padding: 32px 24px;
+            text-align: center;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+            backdrop-filter: blur(2px);
+        }
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 16px;
+            color: #1e293b;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 32px 0 20px;
+        }
+        button {
+            background: #2c7da0;
+            color: white;
+            border: none;
+            padding: 16px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        button:active {
+            transform: scale(0.97);
+            background: #1f5e7a;
+        }
+        .status {
+            background: #e6f7ff;
+            padding: 12px;
+            border-radius: 30px;
+            color: #014361;
+            font-size: 0.9rem;
+        }
+        @media (max-width: 550px) {
+            .card { padding: 24px 16px; }
+            h1 { font-size: 1.8rem; }
+            button { padding: 14px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🔐 Face Recognition</h1>
+    <div class="btn-group">
+        <button onclick="location.href='register.html'">📝 ลงทะเบียนใบหน้า</button>
+        <button onclick="location.href='scan.html'">🚀 ล็อกอินเข้าทำงาน</button>
+    </div>
+    <div class="status">
+        👋 ยินดีต้อนรับ | ระบบจดจำใบหน้าผ่านกล้อง
+    </div>
+</div>
+</body>
+</html>

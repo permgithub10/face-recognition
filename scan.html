@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>สแกนใบหน้าเข้าทำงาน</title>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 36px;
+            overflow: hidden;
+            padding: 20px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.3);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 12px;
+            color: #1e293b;
+        }
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 28px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            width: 100%;
+            height: 62vh;
+            min-height: 320px;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #0ef, #0ef, transparent);
+            box-shadow: 0 0 12px #0ef;
+            opacity: 0.9;
+            pointer-events: none;
+            animation: scanMove 2.2s ease-in-out infinite;
+            z-index: 5;
+        }
+        @keyframes scanMove {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100%); }
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            border-radius: 60px;
+            border: none;
+            background: #475569;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        button:active { transform: scale(0.97); }
+        .status {
+            background: #e6f7ff;
+            padding: 12px;
+            border-radius: 28px;
+            margin-top: 16px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        @media (max-width: 550px) {
+            .container { padding: 16px; }
+            .video-wrapper { height: 55vh; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🔓 ล็อกอินด้วยใบหน้า</h2>
+    <div class="video-wrapper" id="videoWrapper">
+        <video id="scanVideo" autoplay muted playsinline></video>
+        <div id="scanLine" class="scan-line"></div>
+    </div>
+    <button id="backHomeBtn">◀ กลับหน้าแรก</button>
+    <div id="loginStatus" class="status">🟢 กำลังสแกนอัตโนมัติ... กรุณามองกล้อง</div>
+</div>
+
+<script>
+    // 🔁 แก้ไขเป็น URL ของ Apps Script ที่ deploy แล้ว
+    const API_URL = "https://script.google.com/macros/s/AKfycbxYu2nQuMcTIYj5Mlnl8S-5l99LzrDU0fsfYiafTtyJklQjHPgEyqobtuCEBEl08o2P/exec";
+
+    let modelsLoaded = false;
+    let currentStream = null;
+    let autoLoginInterval = null;
+    let isProcessing = false;
+    let loginSuccess = false;
+
+    const video = document.getElementById('scanVideo');
+    const loginStatusDiv = document.getElementById('loginStatus');
+
+    async function startCamera() {
+        if (currentStream) stopCamera();
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            currentStream = stream;
+            await video.play();
+            return true;
+        } catch (err) {
+            loginStatusDiv.innerText = "❌ เปิดกล้องไม่สำเร็จ";
+            return false;
+        }
+    }
+    function stopCamera() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        video.srcObject = null;
+    }
+
+    async function loadModels() {
+        const MODEL_URL = './models';
+        try {
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+            loginStatusDiv.innerText = "🟢 ระบบพร้อม เริ่มสแกนอัตโนมัติ";
+        } catch (err) {
+            console.error(err);
+            loginStatusDiv.innerText = "❌ โหลดโมเดลไม่สำเร็จ";
+        }
+    }
+
+    async function getFaceDescriptor() {
+        if (!modelsLoaded) throw new Error("Model not ready");
+        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+        if (!detection) return null;
+        return detection.descriptor;
+    }
+
+    async function attemptAutoLogin() {
+        if (!modelsLoaded || loginSuccess || isProcessing) return;
+        if (!document.body.contains(video)) return;
+        isProcessing = true;
+        try {
+            const descriptor = await getFaceDescriptor();
+            if (!descriptor) {
+                loginStatusDiv.innerText = "📷 ยังไม่เห็นใบหน้า กำลังสแกน...";
+                isProcessing = false;
+                return;
+            }
+            const descriptorArr = Array.from(descriptor);
+            loginStatusDiv.innerText = "🔄 กำลังตรวจสอบกับระบบ...";
+            const formData = new URLSearchParams();
+            formData.append('action', 'login');
+            formData.append('descriptor', JSON.stringify(descriptorArr));
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', API_URL);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        if (result.success) {
+                            loginSuccess = true;
+                            loginStatusDiv.innerHTML = `🎉 ยินดีต้อนรับ ${result.name} | ล็อกอินสำเร็จ!`;
+                            if (autoLoginInterval) clearInterval(autoLoginInterval);
+                            const scanLine = document.getElementById('scanLine');
+                            if (scanLine) scanLine.style.display = 'none';
+                            alert(`✅ ล็อกอินสำเร็จ! คุณ ${result.name}`);
+                        } else {
+                            loginStatusDiv.innerText = "❌ " + (result.message || "ไม่พบใบหน้าที่ลงทะเบียน");
+                        }
+                    } catch(e) {
+                        loginStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับผิดพลาด";
+                    }
+                } else {
+                    loginStatusDiv.innerText = `🌐 HTTP ${xhr.status}`;
+                }
+                isProcessing = false;
+            };
+            xhr.onerror = function() {
+                loginStatusDiv.innerText = "🌐 การเชื่อมต่อล้มเหลว";
+                isProcessing = false;
+            };
+            xhr.send(formData);
+        } catch(err) {
+            console.error(err);
+            loginStatusDiv.innerText = "⚠️ ข้อผิดพลาดในการตรวจจับ";
+            isProcessing = false;
+        }
+    }
+
+    function startAutoLoginLoop() {
+        if (autoLoginInterval) clearInterval(autoLoginInterval);
+        autoLoginInterval = setInterval(() => {
+            attemptAutoLogin();
+        }, 2800);
+    }
+    function stopAutoLoginLoop() {
+        if (autoLoginInterval) {
+            clearInterval(autoLoginInterval);
+            autoLoginInterval = null;
+        }
+    }
+    function goHome() {
+        stopAutoLoginLoop();
+        stopCamera();
+        location.href = 'index.html';
+    }
+
+    window.onload = async () => {
+        await loadModels();
+        const cameraOk = await startCamera();
+        if (cameraOk) startAutoLoginLoop();
+        document.getElementById('backHomeBtn').onclick = goHome;
+    };
+    window.onbeforeunload = () => {
+        stopAutoLoginLoop();
+        stopCamera();
+    };
+</script>
+</body>
+</html>
