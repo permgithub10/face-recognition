@@ -113,8 +113,8 @@
 </div>
 
 <script>
-    // 🔁 แก้ไขเป็น URL ของ Apps Script ที่ deploy แล้ว
-    const API_URL = "https://script.google.com/macros/s/AKfycbxYu2nQuMcTIYj5Mlnl8S-5l99LzrDU0fsfYiafTtyJklQjHPgEyqobtuCEBEl08o2P/exec";
+    // ---------- ตั้งค่า API URL (เปลี่ยนเป็น Apps Script URL ของคุณ) ----------
+    const API_URL = "https://script.google.com/macros/s/AKfycby5NA4JZDM_YBsVGbIg0Ws9CaTDH7f3BWa4GJQXHXa6QX0kr_4GQvaB7cdFkRqqeYbx/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -167,6 +167,7 @@
         return detection.descriptor;
     }
 
+    // ใช้ XMLHttpRequest เพื่อหลีกเลี่ยงปัญหา Failed to fetch
     async function registerFace() {
         const name = regNameInput.value.trim();
         if (!name) {
@@ -206,6 +207,7 @@
                 try {
                     const result = JSON.parse(xhr.responseText);
                     if (result.success) {
+                        // ✅ Popup ตามที่ต้องการ
                         alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
                         regStatusDiv.innerText = "✔️ บันทึกสำเร็จ! สามารถลงทะเบียนเพิ่มหรือกลับหน้าแรก";
                         regNameInput.value = "";
