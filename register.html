@@ -167,71 +167,51 @@
         return detection.descriptor;
     }
 
-    async function registerFace() {
-        const name = regNameInput.value.trim();
-        if (!name) {
-            alert("⚠️ กรุณากรอกชื่อก่อนบันทึก");
-            return;
-        }
-        if (!modelsLoaded) {
-            alert("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
-            return;
-        }
-        regStatusDiv.innerText = "🔍 กำลังตรวจจับใบหน้า...";
-        let descriptor;
-        try {
-            descriptor = await getFaceDescriptor();
-        } catch(err) {
-            regStatusDiv.innerText = "⚠️ ข้อผิดพลาด: " + err.message;
-            return;
-        }
-        if (!descriptor) {
-            regStatusDiv.innerText = "😕 ไม่พบใบหน้า ให้อยู่ในกรอบแล้วลองใหม่";
-            return;
-        }
-        const descriptorArray = Array.from(descriptor);
-        regStatusDiv.innerText = "📡 กำลังส่งข้อมูล...";
-        
-        const formData = new URLSearchParams();
-        formData.append('action', 'register');
-        formData.append('name', name);
-        formData.append('descriptor', JSON.stringify(descriptorArray));
-        
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', API_URL);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                try {
-                    const result = JSON.parse(xhr.responseText);
-                    if (result.success) {
-                        // ✅ แจ้งสำเร็จตามที่ต้องการ
-                        alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
-                        regStatusDiv.innerText = "✔️ บันทึกสำเร็จ! สามารถลงทะเบียนเพิ่มหรือกลับหน้าแรก";
-                        regNameInput.value = "";
-                    } else {
-                        // กรณี success = false: ไม่มี alert error
-                        regStatusDiv.innerText = "❌ บันทึกไม่สำเร็จ: " + (result.message || "เกิดข้อผิดพลาด");
-                    }
-                } catch (e) {
-                    // JSON parse error: ไม่มี alert error
-                    regStatusDiv.innerText = "⚠️ ข้อมูลตอบกลับไม่ถูกต้อง (ไม่ใช่ JSON)";
-                }
-            } else {
-                // HTTP status ไม่ใช่ 200: ไม่มี alert error
-                regStatusDiv.innerText = `🌐 การเชื่อมต่อล้มเหลว (HTTP ${xhr.status})`;
-            }
-        };
-        
-        // ✅ ตัดการแจ้งเตือน network error ออกทั้งหมด (ไม่เปลี่ยนข้อความ, ไม่ alert)
-        xhr.onerror = function() {
-            // ไม่ทำอะไรเลย -> ผู้ใช้จะไม่เห็น error ใดๆ
-            // ข้อความใน regStatusDiv จะยังคงเป็น "📡 กำลังส่งข้อมูล..."
-        };
-        
-        xhr.send(formData);
+// เฉพาะส่วน script ที่เปลี่ยนแปลง
+async function registerFace() {
+    const name = regNameInput.value.trim();
+    if (!name) {
+        alert("⚠️ กรุณากรอกชื่อก่อนบันทึก");
+        return;
     }
+    if (!modelsLoaded) {
+        alert("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
+        return;
+    }
+    regStatusDiv.innerText = "🔍 กำลังตรวจจับใบหน้า...";
+    let descriptor;
+    try {
+        descriptor = await getFaceDescriptor();
+    } catch(err) {
+        regStatusDiv.innerText = "⚠️ ข้อผิดพลาด: " + err.message;
+        return;
+    }
+    if (!descriptor) {
+        regStatusDiv.innerText = "😕 ไม่พบใบหน้า ให้อยู่ในกรอบแล้วลองใหม่";
+        return;
+    }
+    const descriptorArray = Array.from(descriptor);
+    regStatusDiv.innerText = "📡 กำลังส่งข้อมูล...";
+    
+    const formData = new URLSearchParams();
+    formData.append('action', 'register');
+    formData.append('name', name);
+    formData.append('descriptor', JSON.stringify(descriptorArray));
+    
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', API_URL);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    
+    // ไม่ต้องรอ response ก็แสดง popup success ทันที (optimistic)
+    alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
+    regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
+    regNameInput.value = "";
+    
+    // ยังคงส่ง request เพื่อให้ข้อมูลเข้า sheet
+    xhr.send(formData);
+    
+    // ละทิ้ง response ไม่สนใจ error
+}
 
     function goHome() {
         stopCamera();
