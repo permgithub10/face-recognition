@@ -45,27 +45,22 @@
             min-height: 320px;
         }
         video {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
         }
-        .scan-line {
+        canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, transparent, #0ef, #0ef, transparent);
-            box-shadow: 0 0 12px #0ef;
-            opacity: 0.9;
-            pointer-events: none;
-            animation: scanMove 2.2s ease-in-out infinite;
-            z-index: 5;
-        }
-        @keyframes scanMove {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(100%); }
+            height: 100%;
+            display: block;
+            pointer-events: none; /* ให้คลิกผ่านไปที่ปุ่มด้านล่างได้ */
         }
         button {
             width: 100%;
@@ -79,14 +74,8 @@
             cursor: pointer;
             margin-top: 8px;
         }
-        button:active { transform: scale(0.97); }
-        .status {
-            background: #e6f7ff;
-            padding: 12px;
-            border-radius: 28px;
-            margin-top: 16px;
-            text-align: center;
-            font-size: 0.9rem;
+        button:active {
+            transform: scale(0.97);
         }
         /* ---------- Overlay Modal ---------- */
         .overlay {
@@ -156,15 +145,15 @@
 <body>
 <div class="container">
     <h2>🔓 ล็อกอินด้วยใบหน้า</h2>
-    <div class="video-wrapper" id="videoWrapper">
+    <div class="video-wrapper">
         <video id="scanVideo" autoplay muted playsinline></video>
-        <div id="scanLine" class="scan-line"></div>
+        <canvas id="faceCanvas"></canvas>
     </div>
     <button id="backHomeBtn">◀ กลับหน้าแรก</button>
-    <div id="loginStatus" class="status">🟢 กำลังสแกนอัตโนมัติ... กรุณามองกล้อง</div>
+    <!-- ไม่มี status message แล้ว -->
 </div>
 
-<!-- Overlay Modal -->
+<!-- Overlay Modal สำหรับแสดงผลล็อกอินสำเร็จ -->
 <div id="successOverlay" class="overlay">
     <div class="overlay-content">
         <p id="overlayMessage">✅ ล็อกอินสำเร็จ!</p>
@@ -173,16 +162,18 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";  // 🔁 แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
     let autoLoginInterval = null;
     let isProcessing = false;
     let loginSuccess = false;
+    let animationFrameId = null;
 
     const video = document.getElementById('scanVideo');
-    const loginStatusDiv = document.getElementById('loginStatus');
+    const canvas = document.getElementById('faceCanvas');
+    const ctx = canvas.getContext('2d');
 
     // Overlay elements
     const overlay = document.getElementById('successOverlay');
@@ -201,6 +192,16 @@
         if (e.target === overlay) hideOverlay();
     };
 
+    // ตั้งขนาด canvas ให้เท่ากับ video-wrapper
+    function resizeCanvas() {
+        const wrapper = document.querySelector('.video-wrapper');
+        if (wrapper) {
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
+        }
+    }
+    window.addEventListener('resize', resizeCanvas);
+
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
@@ -208,9 +209,10 @@
             video.srcObject = stream;
             currentStream = stream;
             await video.play();
+            resizeCanvas();
             return true;
         } catch (err) {
-            loginStatusDiv.innerText = "❌ เปิดกล้องไม่สำเร็จ";
+            console.error(err);
             return false;
         }
     }
@@ -220,6 +222,10 @@
             currentStream = null;
         }
         video.srcObject = null;
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
     }
 
     async function loadModels() {
@@ -229,13 +235,59 @@
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            loginStatusDiv.innerText = "🟢 ระบบพร้อม เริ่มสแกนอัตโนมัติ";
+            console.log("Models loaded");
+            startDrawing();  // เริ่มวาดกรอบใบหน้า
         } catch (err) {
             console.error(err);
-            loginStatusDiv.innerText = "❌ โหลดโมเดลไม่สำเร็จ";
         }
     }
 
+    // ฟังก์ชันวาดกรอบใบหน้าแบบ real-time
+    async function drawFaceBox() {
+        if (!modelsLoaded || !video.videoWidth || video.paused || video.ended) {
+            animationFrameId = requestAnimationFrame(drawFaceBox);
+            return;
+        }
+
+        // ตรวจจับใบหน้า (ใช้ TinyFaceDetector)
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks();
+
+        // ล้าง canvas และปรับขนาดให้ตรงกับ video
+        if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
+            resizeCanvas();
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // แปลงพิกัดให้ mirror (เนื่องจาก video ถูก mirror ด้วย scaleX(-1))
+        const displaySize = { width: canvas.width, height: canvas.height };
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+        // วาดกรอบใบหน้าพร้อมพื้นหลังทึบลงเล็กน้อย
+        resizedDetections.forEach(detection => {
+            const box = detection.detection.box;
+            // วาดพื้นหลังกึ่งโปร่งแสง (fill)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';  // ทึบลงเล็กน้อย
+            ctx.fillRect(box.x, box.y, box.width, box.height);
+            // วาดขอบกรอบสีเขียวสด
+            ctx.strokeStyle = '#0ef';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(box.x, box.y, box.width, box.height);
+            // เพิ่มมุมโค้งมน (optional)
+            ctx.beginPath();
+            ctx.rect(box.x, box.y, box.width, box.height);
+            ctx.stroke();
+        });
+
+        animationFrameId = requestAnimationFrame(drawFaceBox);
+    }
+
+    function startDrawing() {
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(drawFaceBox);
+    }
+
+    // ดึง descriptor สำหรับล็อกอิน
     async function getFaceDescriptor() {
         if (!modelsLoaded) throw new Error("Model not ready");
         const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
@@ -245,22 +297,21 @@
         return detection.descriptor;
     }
 
+    // ฟังก์ชันล็อกอินอัตโนมัติ (ทำงานทุก 2.8 วินาที)
     async function attemptAutoLogin() {
         if (!modelsLoaded || loginSuccess || isProcessing) return;
         isProcessing = true;
         try {
             const descriptor = await getFaceDescriptor();
             if (!descriptor) {
-                loginStatusDiv.innerText = "📷 ยังไม่เห็นใบหน้า กำลังสแกน...";
                 isProcessing = false;
                 return;
             }
             const descriptorArr = Array.from(descriptor);
-            loginStatusDiv.innerText = "🔄 กำลังตรวจสอบกับระบบ...";
             const formData = new URLSearchParams();
             formData.append('action', 'login');
             formData.append('descriptor', JSON.stringify(descriptorArr));
-            
+
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -269,18 +320,11 @@
             const result = await response.json();
             if (result.success) {
                 loginSuccess = true;
-                loginStatusDiv.innerHTML = `🎉 ยินดีต้อนรับ ${result.name} | ล็อกอินสำเร็จ!`;
                 if (autoLoginInterval) clearInterval(autoLoginInterval);
-                const scanLine = document.getElementById('scanLine');
-                if (scanLine) scanLine.style.display = 'none';
-                // ใช้ Overlay แทน alert
                 showOverlay(`✅ ล็อกอินสำเร็จ! คุณ ${result.name}`);
-            } else {
-                loginStatusDiv.innerText = "❌ " + (result.message || "ไม่พบใบหน้าที่ลงทะเบียน");
             }
         } catch(err) {
             console.error(err);
-            loginStatusDiv.innerText = "🌐 การเชื่อมต่อล้มเหลว";
         }
         isProcessing = false;
     }
@@ -308,7 +352,9 @@
     window.onload = async () => {
         await loadModels();
         const cameraOk = await startCamera();
-        if (cameraOk) startAutoLoginLoop();
+        if (cameraOk) {
+            startAutoLoginLoop();
+        }
         document.getElementById('backHomeBtn').onclick = goHome;
     };
     window.onbeforeunload = () => {
