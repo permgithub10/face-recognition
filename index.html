@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Face Recognition</title>
+    <title>ลงชื่อพ่นฆ่าเชื้อ</title>
     <style>
         * {
             margin: 0;
@@ -30,15 +30,24 @@
             backdrop-filter: blur(2px);
         }
         h1 {
-            font-size: 2.2rem;
+            font-size: 1.8rem;
             margin-bottom: 16px;
             color: #1e293b;
+        }
+        .schedule-info {
+            background: #e6f7ff;
+            padding: 12px;
+            border-radius: 30px;
+            margin: 16px 0;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #014361;
         }
         .btn-group {
             display: flex;
             flex-direction: column;
             gap: 16px;
-            margin: 32px 0 20px;
+            margin: 24px 0 20px;
         }
         button {
             background: #2c7da0;
@@ -56,30 +65,56 @@
             transform: scale(0.97);
             background: #1f5e7a;
         }
-        .status {
-            background: #e6f7ff;
+        .footer {
+            background: #e2e8f0;
             padding: 12px;
             border-radius: 30px;
-            color: #014361;
+            color: #2d3748;
             font-size: 0.9rem;
         }
         @media (max-width: 550px) {
             .card { padding: 24px 16px; }
-            h1 { font-size: 1.8rem; }
+            h1 { font-size: 1.5rem; }
             button { padding: 14px; font-size: 1rem; }
         }
     </style>
 </head>
 <body>
 <div class="card">
-    <h1>🔐 Face Recognition</h1>
+    <h1>🧼 ลงชื่อพ่นฆ่าเชื้อประจำสัปดาห์</h1>
+    <div class="schedule-info" id="scheduleStatus">🔄 กำลังโหลดข้อมูลเวลา...</div>
     <div class="btn-group">
         <button onclick="location.href='register.html'">📝 ลงทะเบียนใบหน้า</button>
-        <button onclick="location.href='scan.html'">🚀 ล็อกอินเข้าทำงาน</button>
+        <button onclick="location.href='scan.html'">✅ ลงชื่อ</button>
     </div>
-    <div class="status">
-        👋 ยินดีต้อนรับ | ระบบจดจำใบหน้าผ่านกล้อง
+    <div class="footer">
+        👋 โปรดลงชื่อในช่วงเวลาที่กำหนด
     </div>
 </div>
+
+<script>
+    // 🔁 แก้ไข URL ให้ตรงกับ Apps Script ที่ deploy
+    const API_URL = "https://script.google.com/macros/s/AKfycbzTgY2CNLNT0nQUK79GUnaHHJHNDBvJJQEn0gVoplDAd7QCfL2T5Kw9r2NXSB6xicXM/exec";
+
+    async function loadScheduleStatus() {
+        const scheduleDiv = document.getElementById('scheduleStatus');
+        try {
+            const response = await fetch(`${API_URL}?action=getScheduleStatus`);
+            const result = await response.json();
+            if (result.success && result.canSign !== undefined) {
+                scheduleDiv.innerText = result.message;
+                scheduleDiv.style.backgroundColor = result.canSign ? "#d4edda" : "#f8d7da";
+                scheduleDiv.style.color = result.canSign ? "#155724" : "#721c24";
+            } else {
+                scheduleDiv.innerText = "❌ ไม่สามารถโหลดข้อมูลเวลาได้";
+            }
+        } catch (err) {
+            console.error(err);
+            scheduleDiv.innerText = "⚠️ ตรวจสอบการเชื่อมต่อกับเซิร์ฟเวอร์";
+        }
+    }
+
+    window.onload = loadScheduleStatus;
+</script>
 </body>
 </html>
