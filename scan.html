@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>สแกนใบหน้าเข้าทำงาน</title>
+    <title>ลงชื่อพ่นฆ่าเชื้อ</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         * {
@@ -141,7 +141,7 @@
 </head>
 <body>
 <div class="container">
-    <h2>🔓 ล็อกอินด้วยใบหน้า</h2>
+    <h2>✅ ลงชื่อพ่นฆ่าเชื้อ</h2>
     <div class="video-wrapper">
         <video id="scanVideo" autoplay muted playsinline></video>
     </div>
@@ -157,7 +157,7 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzd7Jd6Rox3J__TzE3aLqAhyekJgyNNwMsjzIK0OpItbfLmrQ2Cy1AoonCmpGaE2P5M/exec";  // 🔁 แก้ไข URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbzTgY2CNLNT0nQUK79GUnaHHJHNDBvJJQEn0gVoplDAd7QCfL2T5Kw9r2NXSB6xicXM/exec";  // 🔁 แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -236,6 +236,23 @@
         return detection.descriptor;
     }
 
+    // ฟังก์ชันตรวจสอบ schedule ก่อนสแกน
+    async function checkSchedule() {
+        try {
+            const response = await fetch(`${API_URL}?action=getScheduleStatus`);
+            if (!response.ok) return { canSign: false, message: "❌ ไม่สามารถตรวจสอบเวลาได้" };
+            const result = await response.json();
+            if (result.success && result.canSign !== undefined) {
+                return { canSign: result.canSign, message: result.message };
+            } else {
+                return { canSign: false, message: "❌ ข้อมูลเวลาไม่ถูกต้อง" };
+            }
+        } catch (err) {
+            console.error(err);
+            return { canSign: false, message: "❌ ตรวจสอบเวลาไม่ได้ (network error)" };
+        }
+    }
+
     async function performScan() {
         if (isScanning) return;
         if (!modelsLoaded) {
@@ -245,7 +262,15 @@
 
         disableScanButton();
 
-        // ตรวจจับใบหน้า
+        // ✅ ขั้นตอนที่ 1: ตรวจสอบ schedule
+        const schedule = await checkSchedule();
+        if (!schedule.canSign) {
+            showOverlay(schedule.message);
+            scanCompleted = true;   // ทำให้ปุ่มกลับมา active หลังปิด overlay
+            return;
+        }
+
+        // ✅ ขั้นตอนที่ 2: ตรวจจับใบหน้า
         const descriptor = await getFaceDescriptor();
         if (!descriptor) {
             showOverlay("❌ ไม่พบใบหน้า กรุณามองกล้องให้ชัดเจน");
@@ -253,6 +278,7 @@
             return;
         }
 
+        // ✅ ขั้นตอนที่ 3: ส่ง descriptor เพื่อลงชื่อ
         const descriptorArray = Array.from(descriptor);
         const formData = new URLSearchParams();
         formData.append('action', 'login');
@@ -267,27 +293,16 @@
             if (response.ok) {
                 const result = await response.json();
                 if (result.success && result.name) {
-                    // ✅ แสดงชื่อผู้ใช้จาก response
-                    showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
+                    showOverlay(`✅ ${result.name} ลงชื่อสำเร็จ!`);
                 } else {
-                    // กรณี response ไม่มี name (ไม่ควรเกิด) แต่ก็แสดงสำเร็จ
-                    showOverlay(`✅ ล็อกอินสำเร็จ!`);
+                    showOverlay(`✅ ลงชื่อสำเร็จ!`);
                 }
             } else {
-                // response ไม่ ok แต่ข้อมูลเข้า sheet2 แล้ว -> ไม่แสดง error
-                // เนื่องจากเราไม่มีชื่อจาก response จึงแสดงเฉพาะสำเร็จ (ไม่มีชื่อ)
-                showOverlay(`✅ ล็อกอินสำเร็จ!`);
+                showOverlay(`✅ ลงชื่อสำเร็จ!`);
             }
         } catch (error) {
-            // network error หรือ parse error – ข้อมูลเข้า sheet2 แล้ว แต่ไม่ได้รับชื่อ
             console.error("Login error (ignored):", error);
-            // ไม่แสดง error ใดๆ แก่ผู้ใช้ แต่ถ้าต้องการให้แสดง overlay สำเร็จ (ไม่มีชื่อ)
-            // สามารถเปิดบรรทัดด้านล่างได้
-            // showOverlay(`✅ ล็อกอินสำเร็จ!`);
-            // แต่เพื่อไม่ให้สับสน ให้แสดง overlay เฉพาะเมื่อมี response เท่านั้น
-            // หาก network error จริง จะไม่แสดง overlay (ผู้ใช้ต้องกดสแกนใหม่)
-            // แต่ถ้าต้องการให้แสดงทุกกรณี ให้เอาคอมเม้นต์ออก
-            showOverlay(`✅ ล็อกอินสำเร็จ!`);
+            showOverlay(`✅ ลงชื่อสำเร็จ!`);
         }
         scanCompleted = true;
     }
