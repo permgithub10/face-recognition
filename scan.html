@@ -45,22 +45,10 @@
             min-height: 320px;
         }
         video {
-            position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
-        }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: block;
-            pointer-events: none;
         }
         button {
             width: 100%;
@@ -68,16 +56,26 @@
             font-size: 1rem;
             border-radius: 60px;
             border: none;
-            background: #475569;
+            background: #2c7da0;
             color: white;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 8px;
+            margin-top: 12px;
+            transition: 0.2s;
         }
         button:active {
             transform: scale(0.97);
         }
-        /* Overlay Modal */
+        button.secondary {
+            background: #475569;
+            margin-top: 8px;
+        }
+        button:disabled {
+            background: #94a3b8;
+            transform: none;
+            cursor: not-allowed;
+        }
+        /* ---------- Overlay Modal ---------- */
         .overlay {
             position: fixed;
             top: 0;
@@ -147,33 +145,35 @@
     <h2>🔓 ล็อกอินด้วยใบหน้า</h2>
     <div class="video-wrapper">
         <video id="scanVideo" autoplay muted playsinline></video>
-        <canvas id="faceCanvas"></canvas>
+        <!-- ไม่มี canvas สำหรับวาดกรอบแล้ว -->
     </div>
-    <button id="backHomeBtn">◀ กลับหน้าแรก</button>
+    <button id="startScanBtn">🚀 เริ่มสแกนใบหน้า</button>
+    <button id="backHomeBtn" class="secondary">◀ กลับหน้าแรก</button>
 </div>
 
-<div id="successOverlay" class="overlay">
+<!-- Overlay Modal แสดงผลลัพธ์ -->
+<div id="resultOverlay" class="overlay">
     <div class="overlay-content">
-        <p id="overlayMessage">✅ ล็อกอินสำเร็จ!</p>
+        <p id="overlayMessage"></p>
         <button id="closeOverlayBtn">ตกลง</button>
     </div>
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";  // 🔁 แก้ไข URL
+    // ---------- ตั้งค่า API URL (เปลี่ยนเป็น Apps Script URL ของคุณ) ----------
+    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
-    let autoLoginInterval = null;
-    let isProcessing = false;
-    let loginSuccess = false;
-    let animationFrameId = null;
+    let isScanning = false;        // กำลังสแกนหรือไม่
+    let scanCompleted = false;     // สแกนเสร็จแล้ว (รอปุ่มกดใหม่)
 
     const video = document.getElementById('scanVideo');
-    const canvas = document.getElementById('faceCanvas');
-    const ctx = canvas.getContext('2d');
+    const startScanBtn = document.getElementById('startScanBtn');
+    const backHomeBtn = document.getElementById('backHomeBtn');
 
-    const overlay = document.getElementById('successOverlay');
+    // Overlay elements
+    const overlay = document.getElementById('resultOverlay');
     const overlayMessage = document.getElementById('overlayMessage');
     const closeOverlayBtn = document.getElementById('closeOverlayBtn');
 
@@ -183,21 +183,26 @@
     }
     function hideOverlay() {
         overlay.classList.remove('active');
-    }
-    closeOverlayBtn.onclick = hideOverlay;
-    overlay.onclick = function(e) {
-        if (e.target === overlay) hideOverlay();
-    };
-
-    function resizeCanvas() {
-        const wrapper = document.querySelector('.video-wrapper');
-        if (wrapper) {
-            canvas.width = wrapper.clientWidth;
-            canvas.height = wrapper.clientHeight;
+        // เมื่อปิด overlay แล้ว ให้เปิดปุ่มสแกนใหม่ (ถ้าสแกนเสร็จแล้ว)
+        if (scanCompleted) {
+            enableScanButton();
         }
     }
-    window.addEventListener('resize', resizeCanvas);
 
+    function enableScanButton() {
+        startScanBtn.disabled = false;
+        startScanBtn.innerText = "🚀 เริ่มสแกนใบหน้า";
+        isScanning = false;
+        scanCompleted = false;
+    }
+
+    function disableScanButton() {
+        startScanBtn.disabled = true;
+        startScanBtn.innerText = "⏳ กำลังสแกน...";
+        isScanning = true;
+    }
+
+    // กล้อง
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
@@ -205,10 +210,10 @@
             video.srcObject = stream;
             currentStream = stream;
             await video.play();
-            resizeCanvas();
             return true;
         } catch (err) {
-            console.error(err);
+            console.error("Camera error:", err);
+            showOverlay("❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง");
             return false;
         }
     }
@@ -218,12 +223,9 @@
             currentStream = null;
         }
         video.srcObject = null;
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
     }
 
+    // โหลดโมเดล face-api
     async function loadModels() {
         const MODEL_URL = './models';
         try {
@@ -231,41 +233,16 @@
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            startDrawing();
+            console.log("Models loaded");
         } catch (err) {
             console.error(err);
+            showOverlay("❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models");
         }
     }
 
-    async function drawFaceBox() {
-        if (!modelsLoaded || !video.videoWidth || video.paused || video.ended) {
-            animationFrameId = requestAnimationFrame(drawFaceBox);
-            return;
-        }
-        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks();
-        if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) resizeCanvas();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const displaySize = { width: canvas.width, height: canvas.height };
-        const resizedDetections = faceapi.resizeResults(detections, displaySize);
-        resizedDetections.forEach(detection => {
-            const box = detection.detection.box;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-            ctx.fillRect(box.x, box.y, box.width, box.height);
-            ctx.strokeStyle = '#0ef';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
-        });
-        animationFrameId = requestAnimationFrame(drawFaceBox);
-    }
-
-    function startDrawing() {
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        animationFrameId = requestAnimationFrame(drawFaceBox);
-    }
-
+    // ดึง descriptor จาก video ขณะนั้น (ครั้งเดียว)
     async function getFaceDescriptor() {
-        if (!modelsLoaded) throw new Error("Model not ready");
+        if (!modelsLoaded) throw new Error("Model ยังไม่โหลด");
         const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
             .withFaceDescriptor();
@@ -273,103 +250,78 @@
         return detection.descriptor;
     }
 
-    // ใช้ XMLHttpRequest แทน fetch เพื่อเลี่ยงปัญหา CORS ที่ทำให้ Response ไม่ถึง
-    function attemptAutoLogin() {
-        if (!modelsLoaded || loginSuccess || isProcessing) return;
-        isProcessing = true;
+    // ฟังก์ชันหลักสำหรับสแกนใบหน้า (เรียกเมื่อกดปุ่ม)
+    async function performScan() {
+        if (isScanning) return;
+        if (!modelsLoaded) {
+            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่แล้วลองใหม่");
+            return;
+        }
 
-        (async () => {
-            try {
-                const descriptor = await getFaceDescriptor();
-                if (!descriptor) {
-                    isProcessing = false;
-                    return;
-                }
-                const descriptorArr = Array.from(descriptor);
-                const formData = new URLSearchParams();
-                formData.append('action', 'login');
-                formData.append('descriptor', JSON.stringify(descriptorArr));
+        disableScanButton();
 
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', API_URL);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-                xhr.onload = function() {
-                    if (xhr.status === 200) {
-                        try {
-                            const result = JSON.parse(xhr.responseText);
-                            if (result.success && result.name) {
-                                loginSuccess = true;
-                                if (autoLoginInterval) clearInterval(autoLoginInterval);
-                                showOverlay(`✅ ล็อกอินสำเร็จ! คุณ ${result.name}`);
-                            } else {
-                                // ถ้า response ไม่มี success หรือ name ให้ลองแสดงแบบไม่มีชื่อ
-                                loginSuccess = true;
-                                if (autoLoginInterval) clearInterval(autoLoginInterval);
-                                showOverlay(`✅ ล็อกอินสำเร็จ! (ข้อมูลถูกบันทึกในระบบแล้ว)`);
-                            }
-                        } catch (e) {
-                            // JSON parse error -> แต่ข้อมูลใน Sheet2 มีแล้ว ก็ถือว่าสำเร็จ
-                            console.warn("JSON parse error, but login data is in Sheet2");
-                            loginSuccess = true;
-                            if (autoLoginInterval) clearInterval(autoLoginInterval);
-                            showOverlay(`✅ ล็อกอินสำเร็จ! (ข้อมูลถูกบันทึกในระบบแล้ว)`);
-                        }
-                    } else {
-                        // HTTP status ไม่ใช่ 200 -> แต่อาจบันทึกสำเร็จแล้ว (CORS ปิดกั้น response)
-                        // ให้แสดง overlay แบบ genric
-                        loginSuccess = true;
-                        if (autoLoginInterval) clearInterval(autoLoginInterval);
-                        showOverlay(`✅ ล็อกอินสำเร็จ! (ข้อมูลถูกบันทึกในระบบแล้ว)`);
-                    }
-                    isProcessing = false;
-                };
-
-                xhr.onerror = function() {
-                    // network error แต่ข้อมูลอาจเข้า Sheet แล้ว (กรณี CORS)
-                    // เพื่อให้ user ได้รับการตอบสนอง ให้แสดง overlay
-                    loginSuccess = true;
-                    if (autoLoginInterval) clearInterval(autoLoginInterval);
-                    showOverlay(`✅ ล็อกอินสำเร็จ! (ข้อมูลถูกบันทึกในระบบแล้ว)`);
-                    isProcessing = false;
-                };
-
-                xhr.send(formData);
-            } catch (err) {
-                console.error(err);
-                isProcessing = false;
+        try {
+            // ตรวจจับใบหน้า
+            const descriptor = await getFaceDescriptor();
+            if (!descriptor) {
+                // ไม่พบใบหน้า
+                showOverlay("❌ ไม่พบใบหน้า กรุณามองกล้องให้ชัดเจน");
+                scanCompleted = true;
+                return;
             }
-        })();
-    }
 
-    function startAutoLoginLoop() {
-        if (autoLoginInterval) clearInterval(autoLoginInterval);
-        autoLoginInterval = setInterval(() => {
-            attemptAutoLogin();
-        }, 3000);
-    }
+            const descriptorArray = Array.from(descriptor);
+            const formData = new URLSearchParams();
+            formData.append('action', 'login');
+            formData.append('descriptor', JSON.stringify(descriptorArray));
 
-    function stopAutoLoginLoop() {
-        if (autoLoginInterval) {
-            clearInterval(autoLoginInterval);
-            autoLoginInterval = null;
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.success) {
+                // ล็อกอินสำเร็จ
+                showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
+            } else {
+                // ไม่ตรงกับฐานข้อมูล
+                showOverlay(`❌ กรุณาลองใหม่ (ไม่พบใบหน้าตรงกับระบบ)`);
+            }
+        } catch (err) {
+            console.error("Scan error:", err);
+            showOverlay(`🌐 เกิดข้อผิดพลาด: ${err.message}`);
+        } finally {
+            scanCompleted = true;
+            // ปุ่มจะถูก enable อีกครั้งเมื่อปิด overlay (ใน hideOverlay)
         }
     }
 
+    // กลับหน้าแรก
     function goHome() {
-        stopAutoLoginLoop();
         stopCamera();
         location.href = 'index.html';
     }
 
+    // เริ่มต้น: โหลดโมเดล, เปิดกล้อง, และเตรียมปุ่ม
     window.onload = async () => {
         await loadModels();
-        const cameraOk = await startCamera();
-        if (cameraOk) startAutoLoginLoop();
-        document.getElementById('backHomeBtn').onclick = goHome;
+        await startCamera();
+        startScanBtn.onclick = performScan;
+        backHomeBtn.onclick = goHome;
+        closeOverlayBtn.onclick = hideOverlay;
+        overlay.onclick = function(e) {
+            if (e.target === overlay) hideOverlay();
+        };
+        enableScanButton();  // ปุ่มพร้อมใช้งาน
     };
+
     window.onbeforeunload = () => {
-        stopAutoLoginLoop();
         stopCamera();
     };
 </script>
