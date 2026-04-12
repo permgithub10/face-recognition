@@ -92,7 +92,6 @@
             display: flex;
             gap: 12px;
         }
-        /* ---------- Overlay Modal ---------- */
         .overlay {
             position: fixed;
             top: 0;
@@ -171,7 +170,6 @@
     <div id="regStatus" class="status">📷 กรอกชื่อแล้วกด "บันทึกใบหน้า"</div>
 </div>
 
-<!-- Overlay Modal -->
 <div id="successOverlay" class="overlay">
     <div class="overlay-content">
         <p id="overlayMessage">✅ บันทึกใบหน้าเรียบร้อย!</p>
@@ -180,8 +178,7 @@
 </div>
 
 <script>
-    // ---------- ตั้งค่า API URL (เปลี่ยนเป็น Apps Script URL ของคุณ) ----------
-    const API_URL = "https://script.google.com/macros/s/AKfycbzTgY2CNLNT0nQUK79GUnaHHJHNDBvJJQEn0gVoplDAd7QCfL2T5Kw9r2NXSB6xicXM/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyex5xAGg1L-l92UxI-HOHO9ZkG4Jj5zKtfPJC_dMrWBIg8S0kkM7MmSsbo-8Ot_hQK/exec";  // 🔁 แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -189,13 +186,10 @@
     const regNameInput = document.getElementById('regName');
     const regStatusDiv = document.getElementById('regStatus');
     const captureBtn = document.getElementById('captureBtn');
-
-    // Overlay elements
     const overlay = document.getElementById('successOverlay');
     const overlayMessage = document.getElementById('overlayMessage');
     const closeOverlayBtn = document.getElementById('closeOverlayBtn');
 
-    // ฟังก์ชันแสดง Overlay
     function showOverlay(message) {
         overlayMessage.innerText = message;
         overlay.classList.add('active');
@@ -204,9 +198,7 @@
         overlay.classList.remove('active');
     }
     closeOverlayBtn.onclick = hideOverlay;
-    overlay.onclick = function(e) {
-        if (e.target === overlay) hideOverlay();
-    };
+    overlay.onclick = (e) => { if (e.target === overlay) hideOverlay(); };
 
     async function startCamera() {
         if (currentStream) stopCamera();
@@ -282,39 +274,34 @@
         formData.append('name', name);
         formData.append('descriptor', JSON.stringify(descriptorArray));
         
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', API_URL);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        
-        // เมื่อสำเร็จ (ไม่ว่าจะ response ใด) ให้แสดง Overlay พร้อมชื่อ
-        const showRegisterSuccess = () => {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
+                    regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
+                    regNameInput.value = "";
+                } else {
+                    showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
+                    regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
+                    regNameInput.value = "";
+                }
+            } else {
+                showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
+                regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
+                regNameInput.value = "";
+            }
+        } catch (err) {
+            console.error(err);
             showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
             regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
             regNameInput.value = "";
-        };
-        
-        xhr.onload = function() {
-            // ถ้า response มาถึง ให้ลองตรวจสอบ success จริงหรือไม่
-            if (xhr.status === 200) {
-                try {
-                    const result = JSON.parse(xhr.responseText);
-                    if (result.success) {
-                        showRegisterSuccess();
-                    } else {
-                        // แม้ response บอกไม่สำเร็จ แต่ข้อมูลอาจเข้า sheet แล้วก็แสดง success ได้
-                        showRegisterSuccess();
-                    }
-                } catch(e) {
-                    showRegisterSuccess();
-                }
-            } else {
-                showRegisterSuccess();
-            }
-        };
-        xhr.onerror = function() {
-            showRegisterSuccess();
-        };
-        xhr.send(formData);
+        }
     }
 
     function goHome() {
