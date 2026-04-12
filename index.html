@@ -42,6 +42,7 @@
             font-size: 1rem;
             font-weight: bold;
             color: #014361;
+            white-space: pre-line; /* <--- เพิ่มบรรทัดนี้เพื่อให้แสดงการขึ้นบรรทัดใหม่จาก \n ใน code.gs */
         }
         .btn-group {
             display: flex;
@@ -93,7 +94,7 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbxgBknvz13-BzR4QhksMnHt2-UTATepfwd_N2Wx1zDHh2v7_gWxaO1-39oANUVh3c4e/exec";  // 🔁 แก้ไข URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbxt_8AQRUnV6tGGHntduIcV6QIBtKRwKEBIC0U9lAHsYi7neb7uBN25-y_MfcjePOxe/exec";  // 🔁 แก้ไข URL
 
     async function loadScheduleStatus() {
         const scheduleDiv = document.getElementById('scheduleStatus');
