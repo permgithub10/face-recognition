@@ -157,7 +157,7 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzTgY2CNLNT0nQUK79GUnaHHJHNDBvJJQEn0gVoplDAd7QCfL2T5Kw9r2NXSB6xicXM/exec";  // 🔁 แก้ไข URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbyex5xAGg1L-l92UxI-HOHO9ZkG4Jj5zKtfPJC_dMrWBIg8S0kkM7MmSsbo-8Ot_hQK/exec";  // 🔁 แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -236,7 +236,6 @@
         return detection.descriptor;
     }
 
-    // ฟังก์ชันตรวจสอบ schedule ก่อนสแกน
     async function checkSchedule() {
         try {
             const response = await fetch(`${API_URL}?action=getScheduleStatus`);
@@ -262,15 +261,13 @@
 
         disableScanButton();
 
-        // ✅ ขั้นตอนที่ 1: ตรวจสอบ schedule
         const schedule = await checkSchedule();
         if (!schedule.canSign) {
             showOverlay(schedule.message);
-            scanCompleted = true;   // ทำให้ปุ่มกลับมา active หลังปิด overlay
+            scanCompleted = true;
             return;
         }
 
-        // ✅ ขั้นตอนที่ 2: ตรวจจับใบหน้า
         const descriptor = await getFaceDescriptor();
         if (!descriptor) {
             showOverlay("❌ ไม่พบใบหน้า กรุณามองกล้องให้ชัดเจน");
@@ -278,7 +275,6 @@
             return;
         }
 
-        // ✅ ขั้นตอนที่ 3: ส่ง descriptor เพื่อลงชื่อ
         const descriptorArray = Array.from(descriptor);
         const formData = new URLSearchParams();
         formData.append('action', 'login');
