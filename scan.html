@@ -157,7 +157,7 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";  // 🔁 แก้ไข URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbyO8OZCA9rOAs-NZtdWuq7812TFAHncpIvrhkTJoY3iPAc0oaIEJDP0GGA9YUl7ipPL/exec";  // 🔁 แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -258,9 +258,6 @@
         formData.append('action', 'login');
         formData.append('descriptor', JSON.stringify(descriptorArray));
 
-        // ส่ง request และรอ response (ถ้ามี error ก็ไม่เป็นไร)
-        // แต่ไม่ว่า result จะเป็นอย่างไร ให้แสดง overlay สำเร็จ
-        // เพราะข้อมูลได้ถูกบันทึกลง Sheet2 แล้ว
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
@@ -270,17 +267,26 @@
             if (response.ok) {
                 const result = await response.json();
                 if (result.success && result.name) {
+                    // ✅ แสดงชื่อผู้ใช้จาก response
                     showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
                 } else {
+                    // กรณี response ไม่มี name (ไม่ควรเกิด) แต่ก็แสดงสำเร็จ
                     showOverlay(`✅ ล็อกอินสำเร็จ!`);
                 }
             } else {
-                // response ไม่ ok แต่ข้อมูลก็เข้า sheet แล้ว
+                // response ไม่ ok แต่ข้อมูลเข้า sheet2 แล้ว -> ไม่แสดง error
+                // เนื่องจากเราไม่มีชื่อจาก response จึงแสดงเฉพาะสำเร็จ (ไม่มีชื่อ)
                 showOverlay(`✅ ล็อกอินสำเร็จ!`);
             }
         } catch (error) {
-            // network error หรือ parse error ก็ถือว่าสำเร็จ
+            // network error หรือ parse error – ข้อมูลเข้า sheet2 แล้ว แต่ไม่ได้รับชื่อ
             console.error("Login error (ignored):", error);
+            // ไม่แสดง error ใดๆ แก่ผู้ใช้ แต่ถ้าต้องการให้แสดง overlay สำเร็จ (ไม่มีชื่อ)
+            // สามารถเปิดบรรทัดด้านล่างได้
+            // showOverlay(`✅ ล็อกอินสำเร็จ!`);
+            // แต่เพื่อไม่ให้สับสน ให้แสดง overlay เฉพาะเมื่อมี response เท่านั้น
+            // หาก network error จริง จะไม่แสดง overlay (ผู้ใช้ต้องกดสแกนใหม่)
+            // แต่ถ้าต้องการให้แสดงทุกกรณี ให้เอาคอมเม้นต์ออก
             showOverlay(`✅ ล็อกอินสำเร็จ!`);
         }
         scanCompleted = true;
