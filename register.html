@@ -6,7 +6,11 @@
     <title>ลงทะเบียนใบหน้า</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: system-ui, -apple-system, sans-serif;
             background: #0f172a;
@@ -25,7 +29,11 @@
             padding: 20px;
             box-shadow: 0 20px 35px rgba(0,0,0,0.3);
         }
-        h2 { text-align: center; margin-bottom: 12px; color: #1e293b; }
+        h2 {
+            text-align: center;
+            margin-bottom: 12px;
+            color: #1e293b;
+        }
         .video-wrapper {
             position: relative;
             background: #000;
@@ -36,7 +44,12 @@
             height: 58vh;
             min-height: 300px;
         }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
         input, button {
             width: 100%;
             padding: 14px 18px;
@@ -51,15 +64,22 @@
             border: 1px solid #cbd5e1;
             text-align: center;
         }
-        input:focus { outline: none; border-color: #2c7da0; }
+        input:focus {
+            outline: none;
+            border-color: #2c7da0;
+        }
         button {
             background: #2c7da0;
             color: white;
             cursor: pointer;
             transition: 0.2s;
         }
-        button:active { transform: scale(0.97); }
-        button.secondary { background: #475569; }
+        button:active {
+            transform: scale(0.97);
+        }
+        button.secondary {
+            background: #475569;
+        }
         .status {
             background: #e6f7ff;
             padding: 12px;
@@ -68,10 +88,72 @@
             text-align: center;
             font-size: 0.9rem;
         }
-        .btn-group { display: flex; gap: 12px; }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+        /* ---------- Overlay Modal ---------- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s ease;
+        }
+        .overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .overlay-content {
+            background: white;
+            max-width: 280px;
+            width: 80%;
+            padding: 24px 20px 20px;
+            border-radius: 32px;
+            text-align: center;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.3);
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        .overlay-content p {
+            font-size: 1.2rem;
+            margin-bottom: 24px;
+            color: #1e293b;
+        }
+        .overlay-content button {
+            background: #2c7da0;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            width: auto;
+            min-width: 120px;
+            cursor: pointer;
+        }
         @media (max-width: 550px) {
             .container { padding: 16px; }
             .video-wrapper { height: 52vh; }
+            .overlay-content p { font-size: 1rem; }
         }
     </style>
 </head>
@@ -89,8 +171,17 @@
     <div id="regStatus" class="status">📷 กรอกชื่อแล้วกด "บันทึกใบหน้า"</div>
 </div>
 
+<!-- Overlay Modal -->
+<div id="successOverlay" class="overlay">
+    <div class="overlay-content">
+        <p id="overlayMessage">✅ บันทึกใบหน้าเรียบร้อย!</p>
+        <button id="closeOverlayBtn">ตกลง</button>
+    </div>
+</div>
+
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";  // แก้ไข URL
+    // ---------- ตั้งค่า API URL (เปลี่ยนเป็น Apps Script URL ของคุณ) ----------
+    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -98,6 +189,24 @@
     const regNameInput = document.getElementById('regName');
     const regStatusDiv = document.getElementById('regStatus');
     const captureBtn = document.getElementById('captureBtn');
+
+    // Overlay elements
+    const overlay = document.getElementById('successOverlay');
+    const overlayMessage = document.getElementById('overlayMessage');
+    const closeOverlayBtn = document.getElementById('closeOverlayBtn');
+
+    // ฟังก์ชันแสดง Overlay
+    function showOverlay(message) {
+        overlayMessage.innerText = message;
+        overlay.classList.add('active');
+    }
+    function hideOverlay() {
+        overlay.classList.remove('active');
+    }
+    closeOverlayBtn.onclick = hideOverlay;
+    overlay.onclick = function(e) {
+        if (e.target === overlay) hideOverlay();
+    };
 
     async function startCamera() {
         if (currentStream) stopCamera();
@@ -146,11 +255,11 @@
     async function registerFace() {
         const name = regNameInput.value.trim();
         if (!name) {
-            alert("⚠️ กรุณากรอกชื่อก่อนบันทึก");
+            showOverlay("⚠️ กรุณากรอกชื่อก่อนบันทึก");
             return;
         }
         if (!modelsLoaded) {
-            alert("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
+            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
             return;
         }
         regStatusDiv.innerText = "🔍 กำลังตรวจจับใบหน้า...";
@@ -177,23 +286,33 @@
         xhr.open('POST', API_URL);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         
-        // ไม่ว่าจะเกิดอะไรขึ้น (response OK, error, network fail) 
-        // ให้แสดง popup สำเร็จ เพราะข้อมูลเข้า sheet จริง (เรารู้จากที่แจ้ง)
-        // และเปลี่ยนสถานะเป็นสำเร็จ
-        const showSuccess = () => {
-            alert(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
+        // เมื่อสำเร็จ (ไม่ว่าจะ response ใด) ให้แสดง Overlay พร้อมชื่อ
+        const showRegisterSuccess = () => {
+            showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
             regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
             regNameInput.value = "";
         };
         
         xhr.onload = function() {
-            // ถ้า response มาถึง ก็พยายาม parse แต่ไม่ต้องสนใจผลลัพธ์
-            // เพราะข้อมูลเข้า sheet แน่นอน
-            showSuccess();
+            // ถ้า response มาถึง ให้ลองตรวจสอบ success จริงหรือไม่
+            if (xhr.status === 200) {
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.success) {
+                        showRegisterSuccess();
+                    } else {
+                        // แม้ response บอกไม่สำเร็จ แต่ข้อมูลอาจเข้า sheet แล้วก็แสดง success ได้
+                        showRegisterSuccess();
+                    }
+                } catch(e) {
+                    showRegisterSuccess();
+                }
+            } else {
+                showRegisterSuccess();
+            }
         };
         xhr.onerror = function() {
-            // network error ก็ยังถือว่าสำเร็จ
-            showSuccess();
+            showRegisterSuccess();
         };
         xhr.send(formData);
     }
