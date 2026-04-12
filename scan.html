@@ -75,7 +75,6 @@
             transform: none;
             cursor: not-allowed;
         }
-        /* ---------- Overlay Modal ---------- */
         .overlay {
             position: fixed;
             top: 0;
@@ -145,13 +144,11 @@
     <h2>🔓 ล็อกอินด้วยใบหน้า</h2>
     <div class="video-wrapper">
         <video id="scanVideo" autoplay muted playsinline></video>
-        <!-- ไม่มี canvas สำหรับวาดกรอบแล้ว -->
     </div>
     <button id="startScanBtn">🚀 เริ่มสแกนใบหน้า</button>
     <button id="backHomeBtn" class="secondary">◀ กลับหน้าแรก</button>
 </div>
 
-<!-- Overlay Modal แสดงผลลัพธ์ -->
 <div id="resultOverlay" class="overlay">
     <div class="overlay-content">
         <p id="overlayMessage"></p>
@@ -160,19 +157,16 @@
 </div>
 
 <script>
-    // ---------- ตั้งค่า API URL (เปลี่ยนเป็น Apps Script URL ของคุณ) ----------
-    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbx1jvrkz67Ms8uhmUDztfVHVDIY4ZbcUqeotdhncP9KK9ahoez0xGo3mpErz_eyyBou/exec";  // 🔁 แก้ไข URL
 
     let modelsLoaded = false;
     let currentStream = null;
-    let isScanning = false;        // กำลังสแกนหรือไม่
-    let scanCompleted = false;     // สแกนเสร็จแล้ว (รอปุ่มกดใหม่)
+    let isScanning = false;
+    let scanCompleted = false;
 
     const video = document.getElementById('scanVideo');
     const startScanBtn = document.getElementById('startScanBtn');
     const backHomeBtn = document.getElementById('backHomeBtn');
-
-    // Overlay elements
     const overlay = document.getElementById('resultOverlay');
     const overlayMessage = document.getElementById('overlayMessage');
     const closeOverlayBtn = document.getElementById('closeOverlayBtn');
@@ -183,26 +177,22 @@
     }
     function hideOverlay() {
         overlay.classList.remove('active');
-        // เมื่อปิด overlay แล้ว ให้เปิดปุ่มสแกนใหม่ (ถ้าสแกนเสร็จแล้ว)
         if (scanCompleted) {
             enableScanButton();
         }
     }
-
     function enableScanButton() {
         startScanBtn.disabled = false;
         startScanBtn.innerText = "🚀 เริ่มสแกนใบหน้า";
         isScanning = false;
         scanCompleted = false;
     }
-
     function disableScanButton() {
         startScanBtn.disabled = true;
         startScanBtn.innerText = "⏳ กำลังสแกน...";
         isScanning = true;
     }
 
-    // กล้อง
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
@@ -212,7 +202,6 @@
             await video.play();
             return true;
         } catch (err) {
-            console.error("Camera error:", err);
             showOverlay("❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง");
             return false;
         }
@@ -225,7 +214,6 @@
         video.srcObject = null;
     }
 
-    // โหลดโมเดล face-api
     async function loadModels() {
         const MODEL_URL = './models';
         try {
@@ -233,16 +221,14 @@
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            console.log("Models loaded");
         } catch (err) {
             console.error(err);
             showOverlay("❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models");
         }
     }
 
-    // ดึง descriptor จาก video ขณะนั้น (ครั้งเดียว)
     async function getFaceDescriptor() {
-        if (!modelsLoaded) throw new Error("Model ยังไม่โหลด");
+        if (!modelsLoaded) throw new Error("Model not ready");
         const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
             .withFaceDescriptor();
@@ -250,21 +236,19 @@
         return detection.descriptor;
     }
 
-    // ฟังก์ชันหลักสำหรับสแกนใบหน้า (เรียกเมื่อกดปุ่ม)
+    // ฟังก์ชันสแกน – ใช้ XMLHttpRequest เพื่อจัดการ error แบบเงียบ
     async function performScan() {
         if (isScanning) return;
         if (!modelsLoaded) {
-            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่แล้วลองใหม่");
+            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
             return;
         }
 
         disableScanButton();
 
         try {
-            // ตรวจจับใบหน้า
             const descriptor = await getFaceDescriptor();
             if (!descriptor) {
-                // ไม่พบใบหน้า
                 showOverlay("❌ ไม่พบใบหน้า กรุณามองกล้องให้ชัดเจน");
                 scanCompleted = true;
                 return;
@@ -275,55 +259,68 @@
             formData.append('action', 'login');
             formData.append('descriptor', JSON.stringify(descriptorArray));
 
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData
-            });
+            // ใช้ XMLHttpRequest เพื่อไม่ให้ error แสดงผล (ไม่มี alert หรือ overlay error)
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', API_URL);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.timeout = 10000; // 10 วินาที
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        if (result.success && result.name) {
+                            showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
+                        } else {
+                            showOverlay(`❌ กรุณาลองใหม่`);
+                        }
+                    } catch (e) {
+                        // ถ้า parse JSON ไม่ได้ ให้ถือว่าลองใหม่
+                        showOverlay(`❌ กรุณาลองใหม่`);
+                    }
+                } else {
+                    // HTTP status ไม่ใช่ 200 – ไม่แสดง error message ที่เกี่ยวกับ network
+                    // แต่ให้แสดง "กรุณาลองใหม่" เฉยๆ (ไม่แจ้ง failed to fetch)
+                    showOverlay(`❌ กรุณาลองใหม่`);
+                }
+                scanCompleted = true;
+            };
 
-            const result = await response.json();
-            if (result.success) {
-                // ล็อกอินสำเร็จ
-                showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
-            } else {
-                // ไม่ตรงกับฐานข้อมูล
-                showOverlay(`❌ กรุณาลองใหม่ (ไม่พบใบหน้าตรงกับระบบ)`);
-            }
+            xhr.onerror = function() {
+                // เกิด network error (failed to fetch) – ไม่แสดงข้อความ error
+                // แต่ให้แสดง overlay ให้ลองใหม่ (ไม่แจ้ง technical error)
+                showOverlay(`❌ กรุณาลองใหม่`);
+                scanCompleted = true;
+            };
+
+            xhr.ontimeout = function() {
+                showOverlay(`❌ กรุณาลองใหม่ (เวลาหมด)`);
+                scanCompleted = true;
+            };
+
+            xhr.send(formData);
         } catch (err) {
-            console.error("Scan error:", err);
-            showOverlay(`🌐 เกิดข้อผิดพลาด: ${err.message}`);
-        } finally {
+            console.error(err);
+            showOverlay(`❌ กรุณาลองใหม่`);
             scanCompleted = true;
-            // ปุ่มจะถูก enable อีกครั้งเมื่อปิด overlay (ใน hideOverlay)
         }
     }
 
-    // กลับหน้าแรก
     function goHome() {
         stopCamera();
         location.href = 'index.html';
     }
 
-    // เริ่มต้น: โหลดโมเดล, เปิดกล้อง, และเตรียมปุ่ม
     window.onload = async () => {
         await loadModels();
         await startCamera();
         startScanBtn.onclick = performScan;
         backHomeBtn.onclick = goHome;
         closeOverlayBtn.onclick = hideOverlay;
-        overlay.onclick = function(e) {
-            if (e.target === overlay) hideOverlay();
-        };
-        enableScanButton();  // ปุ่มพร้อมใช้งาน
+        overlay.onclick = (e) => { if (e.target === overlay) hideOverlay(); };
+        enableScanButton();
     };
-
-    window.onbeforeunload = () => {
-        stopCamera();
-    };
+    window.onbeforeunload = () => stopCamera();
 </script>
 </body>
 </html>
