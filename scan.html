@@ -236,7 +236,6 @@
         return detection.descriptor;
     }
 
-    // ฟังก์ชันสแกน – ใช้ XMLHttpRequest เพื่อจัดการ error แบบเงียบ
     async function performScan() {
         if (isScanning) return;
         if (!modelsLoaded) {
@@ -259,49 +258,33 @@
             formData.append('action', 'login');
             formData.append('descriptor', JSON.stringify(descriptorArray));
 
-            // ใช้ XMLHttpRequest เพื่อไม่ให้ error แสดงผล (ไม่มี alert หรือ overlay error)
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', API_URL);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-            xhr.timeout = 10000; // 10 วินาที
+            // ใช้ fetch โดยไม่แสดง error technical ใดๆ
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
 
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    try {
-                        const result = JSON.parse(xhr.responseText);
-                        if (result.success && result.name) {
-                            showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
-                        } else {
-                            showOverlay(`❌ กรุณาลองใหม่`);
-                        }
-                    } catch (e) {
-                        // ถ้า parse JSON ไม่ได้ ให้ถือว่าลองใหม่
-                        showOverlay(`❌ กรุณาลองใหม่`);
-                    }
-                } else {
-                    // HTTP status ไม่ใช่ 200 – ไม่แสดง error message ที่เกี่ยวกับ network
-                    // แต่ให้แสดง "กรุณาลองใหม่" เฉยๆ (ไม่แจ้ง failed to fetch)
-                    showOverlay(`❌ กรุณาลองใหม่`);
-                }
+            // ถ้า response ไม่ ok (เช่น 404, 500) ให้ถือว่าไม่สำเร็จ
+            if (!response.ok) {
+                showOverlay("❌ กรุณาลองใหม่");
                 scanCompleted = true;
-            };
+                return;
+            }
 
-            xhr.onerror = function() {
-                // เกิด network error (failed to fetch) – ไม่แสดงข้อความ error
-                // แต่ให้แสดง overlay ให้ลองใหม่ (ไม่แจ้ง technical error)
-                showOverlay(`❌ กรุณาลองใหม่`);
-                scanCompleted = true;
-            };
-
-            xhr.ontimeout = function() {
-                showOverlay(`❌ กรุณาลองใหม่ (เวลาหมด)`);
-                scanCompleted = true;
-            };
-
-            xhr.send(formData);
-        } catch (err) {
-            console.error(err);
-            showOverlay(`❌ กรุณาลองใหม่`);
+            const result = await response.json();
+            if (result.success && result.name) {
+                // สำเร็จ: แสดงชื่อผู้ใช้
+                showOverlay(`✅ ${result.name} ล็อกอินสำเร็จ!`);
+            } else {
+                // ไม่สำเร็จ (ไม่พบใบหน้าหรือข้อมูลไม่ตรง)
+                showOverlay("❌ กรุณาลองใหม่");
+            }
+        } catch (error) {
+            // จับ error ทั้งหมด (network error, parse error, etc.) -> ไม่แสดง technical message
+            console.error("Scan error:", error);
+            showOverlay("❌ กรุณาลองใหม่");
+        } finally {
             scanCompleted = true;
         }
     }
