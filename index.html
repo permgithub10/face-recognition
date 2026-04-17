@@ -66,6 +66,13 @@
             transform: scale(0.97);
             background: #1f5e7a;
         }
+        button:disabled {
+            background: #a0aec0;
+            box-shadow: none;
+            transform: none;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
         .footer {
             background: #e2e8f0;
             padding: 12px;
@@ -82,11 +89,11 @@
 </head>
 <body>
 <div class="card">
-    <h1>🧼 ระบบลงชื่อพ่นฆ่าเชื้อ</h1>
+    <h1>🧼 ลงชื่อพ่นฆ่าเชื้อประจำสัปดาห์</h1>
     <div class="schedule-info" id="scheduleStatus">🔄 กำลังโหลดข้อมูลเวลา...</div>
     <div class="btn-group">
         <button onclick="location.href='register.html'">📝 ลงทะเบียนใบหน้า</button>
-        <button onclick="location.href='scan.html'">✅ ลงชื่อ</button>
+        <button id="scanButton" disabled>✅ ลงชื่อ</button>
     </div>
     <div class="footer">
         👋 โปรดลงชื่อในช่วงเวลาที่กำหนด
@@ -97,25 +104,50 @@
     // ⚠️ กรุณาเปลี่ยน URL ด้านล่างเป็น URL ของ Web App ที่ deploy แล้ว
     const API_URL = "https://script.google.com/macros/s/AKfycbwm_LnuYnfIh9_m4ax3lvFbJXnh-XXb67j85NGRlt1ZQP1nm13xXrItIwKicM4mmnd6/exec";
 
+    const scheduleDiv = document.getElementById('scheduleStatus');
+    const scanButton = document.getElementById('scanButton');
+
+    // ฟังก์ชันสำหรับอัปเดต UI ตามสถานะ canSign
+    function updateUIFromSchedule(canSign, message) {
+        scheduleDiv.innerText = message;
+        if (canSign) {
+            scheduleDiv.style.backgroundColor = "#d4edda";
+            scheduleDiv.style.color = "#155724";
+            scanButton.disabled = false;
+        } else {
+            scheduleDiv.style.backgroundColor = "#fff3cd";
+            scheduleDiv.style.color = "#856404";
+            scanButton.disabled = true;
+        }
+    }
+
     async function loadScheduleStatus() {
-        const scheduleDiv = document.getElementById('scheduleStatus');
         try {
             const response = await fetch(`${API_URL}?action=getScheduleStatus`);
             const result = await response.json();
             if (result.success && result.canSign !== undefined) {
-                scheduleDiv.innerText = result.message;
-                scheduleDiv.style.backgroundColor = result.canSign ? "#d4edda" : "#fff3cd";
-                scheduleDiv.style.color = result.canSign ? "#155724" : "#856404";
+                updateUIFromSchedule(result.canSign, result.message);
             } else {
                 scheduleDiv.innerText = "❌ ไม่สามารถโหลดข้อมูลเวลาได้";
+                scanButton.disabled = true;
             }
         } catch (err) {
             console.error(err);
             scheduleDiv.innerText = "⚠️ ตรวจสอบการเชื่อมต่อกับเซิร์ฟเวอร์";
+            scanButton.disabled = true;
         }
     }
 
+    // เมื่อคลิกปุ่มลงชื่อ (จะทำงานเฉพาะเมื่อ enabled)
+    scanButton.addEventListener('click', () => {
+        location.href = 'scan.html';
+    });
+
+    // โหลดสถานะครั้งแรก
     window.onload = loadScheduleStatus;
+
+    // (ตัวเลือก) รีเฟรชสถานะทุกๆ 30 วินาที เผื่อเวลาเปลี่ยนผ่าน
+    setInterval(loadScheduleStatus, 30000);
 </script>
 </body>
 </html>
