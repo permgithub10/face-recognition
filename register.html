@@ -191,7 +191,7 @@
 
 <script>
     // ⚠️ เปลี่ยนเป็น URL ของคุณ
-    const API_URL = "https://script.google.com/macros/s/AKfycby3iyWlBumJ75t-fjPiZX56B-ZNCYSiQrswWpucGnpvV-tYggU3ZSVb0KhE1YeZ4C9e/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxSZSetzJ9D-ZRaxz9cVCcdUbW3amrNGw4m2HJqqCTKC-12w6PB5xXXaVjWSeuktE5c/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -205,12 +205,11 @@
     const overlayMessage = document.getElementById('overlayMessage');
     const closeOverlayBtn = document.getElementById('closeOverlayBtn');
 
-    // ตัวแปรสำหรับเก็บหลาย descriptor
     let capturedDescriptors = [];
     const REQUIRED_SAMPLES = 3;
     let isCapturing = false;
 
-    function showOverlay(message, isSuccess = true) {
+    function showOverlay(message) {
         overlayMessage.innerText = message;
         overlay.classList.add('active');
     }
@@ -259,14 +258,12 @@
         }
     }
 
-    // วนลูปวาดกรอบใบหน้าบน canvas
     async function startFaceDetectionLoop() {
         if (!modelsLoaded) return;
         setInterval(async () => {
             if (video.readyState === 4) {
                 const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
                     .withFaceLandmarks();
-                // ปรับขนาด canvas ให้ตรงกับ video
                 const displaySize = { width: video.videoWidth, height: video.videoHeight };
                 faceapi.matchDimensions(canvas, displaySize);
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -295,17 +292,15 @@
     async function handleCapture() {
         const name = regNameInput.value.trim();
         if (!name) {
-            showOverlay("⚠️ กรุณากรอกชื่อก่อน", false);
+            showOverlay("⚠️ กรุณากรอกชื่อก่อน");
             return;
         }
         if (!modelsLoaded) {
-            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่", false);
+            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
             return;
         }
 
-        // หากยังไม่เริ่มเก็บ หรือเก็บครบแล้วให้เริ่มใหม่
         if (!isCapturing) {
-            // เริ่ม session ใหม่
             capturedDescriptors = [];
             isCapturing = true;
             captureBtn.disabled = false;
@@ -314,12 +309,10 @@
         }
 
         if (capturedDescriptors.length >= REQUIRED_SAMPLES) {
-            // เก็บครบแล้ว -> ส่งข้อมูล
             await submitRegistration(name);
             return;
         }
 
-        // ตรวจจับใบหน้า
         regStatusDiv.innerText = `🔍 กำลังตรวจจับใบหน้า...`;
         try {
             const descriptor = await captureSingleDescriptor();
@@ -351,7 +344,6 @@
         const formData = new URLSearchParams();
         formData.append('action', 'register');
         formData.append('name', name);
-        // ส่ง descriptors array (หลายภาพ)
         formData.append('descriptors', JSON.stringify(capturedDescriptors));
 
         try {
@@ -367,15 +359,14 @@
                 regStatusDiv.innerText = "✔️ ลงทะเบียนสำเร็จ!";
                 regNameInput.value = "";
             } else {
-                showOverlay(`❌ ${result.message}`, false);
+                showOverlay(`❌ ${result.message}`);
                 regStatusDiv.innerText = `❌ ล้มเหลว: ${result.message}`;
             }
         } catch (err) {
             console.error(err);
-            showOverlay(`❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์`, false);
+            showOverlay(`❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์`);
             regStatusDiv.innerText = "❌ การเชื่อมต่อล้มเหลว";
         } finally {
-            // รีเซ็ตสถานะ
             capturedDescriptors = [];
             isCapturing = false;
             captureBtn.disabled = false;
