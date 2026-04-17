@@ -148,15 +148,6 @@
             min-width: 120px;
             cursor: pointer;
         }
-        .counter-badge {
-            display: inline-block;
-            background: #2c7da0;
-            color: white;
-            border-radius: 20px;
-            padding: 4px 12px;
-            margin-left: 8px;
-            font-size: 0.9rem;
-        }
     </style>
 </head>
 <body>
@@ -170,7 +161,7 @@
     <div class="btn-group">
         <button id="backHomeBtn" class="secondary">◀ กลับหน้าแรก</button>
     </div>
-    <div id="regStatus" class="status">📷 กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บใบหน้า 3 มุม</div>
+    <div id="regStatus" class="status">📷 กำลังเริ่มต้นกล้องและโหลดโมเดล...</div>
 </div>
 
 <div id="successOverlay" class="overlay">
@@ -181,7 +172,7 @@
 </div>
 
 <script>
-    // ⚠️ เปลี่ยนเป็น URL ของคุณ
+    // ⚠️ เปลี่ยน URL เป็นของคุณ
     const API_URL = "https://script.google.com/macros/s/AKfycbwm_LnuYnfIh9_m4ax3lvFbJXnh-XXb67j85NGRlt1ZQP1nm13xXrItIwKicM4mmnd6/exec";
 
     let modelsLoaded = false;
@@ -213,7 +204,13 @@
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: "user",
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                } 
+            });
             video.srcObject = stream;
             currentStream = stream;
             await video.play();
@@ -235,14 +232,17 @@
     async function loadModels() {
         const MODEL_URL = './models';
         try {
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
             modelsLoaded = true;
-            regStatusDiv.innerText = "✅ กล้องพร้อม กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บภาพ";
+            return true;
         } catch (err) {
             console.error(err);
             regStatusDiv.innerText = "❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models";
+            return false;
         }
     }
 
@@ -350,8 +350,19 @@
     }
 
     window.onload = async () => {
-        await loadModels();
-        await startCamera();
+        regStatusDiv.innerText = "⏳ กำลังโหลดโมเดลและเปิดกล้อง...";
+        
+        // เริ่มทั้งสองงานพร้อมกัน
+        const modelPromise = loadModels();
+        const cameraPromise = startCamera();
+        const [modelOk, cameraOk] = await Promise.all([modelPromise, cameraPromise]);
+        
+        if (modelOk && cameraOk) {
+            regStatusDiv.innerText = "✅ กล้องพร้อม กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บภาพ";
+        } else {
+            regStatusDiv.innerText = "❌ การเริ่มต้นล้มเหลว โปรดรีเฟรชหน้า";
+        }
+        
         captureBtn.onclick = handleCapture;
         document.getElementById('backHomeBtn').onclick = goHome;
         updateButtonCounter();
