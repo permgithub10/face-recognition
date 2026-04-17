@@ -197,12 +197,21 @@
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
+            // ไม่ระบุขนาดเจาะจง ให้เบราว์เซอร์เลือกความละเอียดที่เหมาะสม ช่วยให้เปิดเร็วขึ้น
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: "user",
+                    // ระบุเฉพาะค่าเผื่อไว้ แต่ไม่บังคับ
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                } 
+            });
             video.srcObject = stream;
             currentStream = stream;
             await video.play();
             return true;
         } catch (err) {
+            console.error(err);
             showOverlay("❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง");
             return false;
         }
@@ -219,9 +228,12 @@
     async function loadModels() {
         const MODEL_URL = './models';
         try {
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            // โหลดโมเดลแบบขนานเพื่อความเร็ว
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
             modelsLoaded = true;
             statusMsg.innerText = "✅ กล้องพร้อม กดปุ่มเพื่อสแกน";
         } catch (err) {
@@ -239,22 +251,6 @@
         return detection.descriptor;
     }
 
-    async function checkSchedule() {
-        try {
-            const response = await fetch(`${API_URL}?action=getScheduleStatus`);
-            if (!response.ok) return { canSign: false, message: "❌ ไม่สามารถตรวจสอบเวลาได้" };
-            const result = await response.json();
-            if (result.success && result.canSign !== undefined) {
-                return { canSign: result.canSign, message: result.message };
-            } else {
-                return { canSign: false, message: "❌ ข้อมูลเวลาไม่ถูกต้อง" };
-            }
-        } catch (err) {
-            console.error(err);
-            return { canSign: false, message: "❌ ตรวจสอบเวลาไม่ได้ (network error)" };
-        }
-    }
-
     async function performScan() {
         if (isScanning) return;
         if (!modelsLoaded) {
@@ -263,17 +259,9 @@
         }
 
         disableScanButton();
-        statusMsg.innerText = "⏳ กำลังตรวจสอบตารางเวลา...";
-
-        const schedule = await checkSchedule();
-        if (!schedule.canSign) {
-            showOverlay(schedule.message);
-            statusMsg.innerText = schedule.message;
-            enableScanButton();
-            return;
-        }
-
         statusMsg.innerText = "🔍 กำลังตรวจจับใบหน้า...";
+
+        // ตรวจจับ descriptor
         const descriptor = await getFaceDescriptor();
         if (!descriptor) {
             showOverlay("❌ ไม่พบใบหน้า กรุณามองกล้องให้ชัดเจน");
@@ -297,8 +285,10 @@
             const result = await response.json();
 
             if (result.success) {
-                showOverlay(`✅ ${result.message}`);
-                statusMsg.innerText = `✅ ${result.message}`;
+                // เปลี่ยนข้อความตามที่ต้องการ
+                const successMessage = result.name ? `คุณ ${result.name} ลงชื่อสำเร็จ` : `✅ ลงชื่อสำเร็จ!`;
+                showOverlay(`✅ ${successMessage}`);
+                statusMsg.innerText = `✅ ${successMessage}`;
             } else {
                 showOverlay(`❌ ${result.message}`);
                 statusMsg.innerText = `❌ ${result.message}`;
@@ -316,8 +306,11 @@
     }
 
     window.onload = async () => {
-        await loadModels();
-        await startCamera();
+        // เริ่มโหลดโมเดลและเปิดกล้องพร้อมกัน (เร็วขึ้น)
+        const modelPromise = loadModels();
+        const cameraPromise = startCamera();
+        await Promise.all([modelPromise, cameraPromise]);
+        
         startScanBtn.onclick = performScan;
         backHomeBtn.onclick = goHome;
         closeOverlayBtn.onclick = hideOverlay;
