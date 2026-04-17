@@ -36,13 +36,13 @@
         }
         .schedule-info {
             background: #e6f7ff;
-            padding: 12px;
+            padding: 16px 12px;
             border-radius: 30px;
-            margin: 16px 0;
-            font-size: 1rem;
+            margin: 20px 0;
+            font-size: 1.1rem;
             font-weight: bold;
             color: #014361;
-            white-space: pre-line; /* <--- เพิ่มบรรทัดนี้เพื่อให้แสดงการขึ้นบรรทัดใหม่จาก \n ใน code.gs */
+            white-space: pre-line;
         }
         .btn-group {
             display: flex;
@@ -94,7 +94,8 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbxt_8AQRUnV6tGGHntduIcV6QIBtKRwKEBIC0U9lAHsYi7neb7uBN25-y_MfcjePOxe/exec";  // 🔁 แก้ไข URL
+    // ⚠️ กรุณาเปลี่ยน URL ด้านล่างเป็น URL ของ Web App ที่ deploy แล้ว
+    const API_URL = "https://script.google.com/macros/s/AKfycby3iyWlBumJ75t-fjPiZX56B-ZNCYSiQrswWpucGnpvV-tYggU3ZSVb0KhE1YeZ4C9e/exec";
 
     async function loadScheduleStatus() {
         const scheduleDiv = document.getElementById('scheduleStatus');
@@ -103,8 +104,8 @@
             const result = await response.json();
             if (result.success && result.canSign !== undefined) {
                 scheduleDiv.innerText = result.message;
-                scheduleDiv.style.backgroundColor = result.canSign ? "#d4edda" : "#f8d7da";
-                scheduleDiv.style.color = result.canSign ? "#155724" : "#721c24";
+                scheduleDiv.style.backgroundColor = result.canSign ? "#d4edda" : "#fff3cd";
+                scheduleDiv.style.color = result.canSign ? "#155724" : "#856404";
             } else {
                 scheduleDiv.innerText = "❌ ไม่สามารถโหลดข้อมูลเวลาได้";
             }
