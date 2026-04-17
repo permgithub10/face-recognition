@@ -50,6 +50,14 @@
             object-fit: cover;
             transform: scaleX(-1);
         }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
         input, button {
             width: 100%;
             padding: 14px 18px;
@@ -76,6 +84,11 @@
         }
         button:active {
             transform: scale(0.97);
+        }
+        button:disabled {
+            background: #94a3b8;
+            transform: none;
+            cursor: not-allowed;
         }
         button.secondary {
             background: #475569;
@@ -123,14 +136,8 @@
             animation: fadeInUp 0.3s ease;
         }
         @keyframes fadeInUp {
-            from {
-                transform: translateY(30px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
         .overlay-content p {
             font-size: 1.2rem;
@@ -149,10 +156,14 @@
             min-width: 120px;
             cursor: pointer;
         }
-        @media (max-width: 550px) {
-            .container { padding: 16px; }
-            .video-wrapper { height: 52vh; }
-            .overlay-content p { font-size: 1rem; }
+        .counter-badge {
+            display: inline-block;
+            background: #2c7da0;
+            color: white;
+            border-radius: 20px;
+            padding: 4px 12px;
+            margin-left: 8px;
+            font-size: 0.9rem;
         }
     </style>
 </head>
@@ -161,28 +172,32 @@
     <h2>📸 ลงทะเบียนใบหน้า</h2>
     <div class="video-wrapper">
         <video id="registerVideo" autoplay muted playsinline></video>
+        <canvas id="overlayCanvas"></canvas>
     </div>
     <input type="text" id="regName" placeholder="ชื่อ-นามสกุล" autocomplete="off">
-    <button id="captureBtn">💾 บันทึกใบหน้า</button>
+    <button id="captureBtn">💾 เริ่มเก็บภาพ (0/3)</button>
     <div class="btn-group">
         <button id="backHomeBtn" class="secondary">◀ กลับหน้าแรก</button>
     </div>
-    <div id="regStatus" class="status">📷 กรอกชื่อแล้วกด "บันทึกใบหน้า"</div>
+    <div id="regStatus" class="status">📷 กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บใบหน้า 3 มุม</div>
 </div>
 
 <div id="successOverlay" class="overlay">
     <div class="overlay-content">
-        <p id="overlayMessage">✅ บันทึกใบหน้าเรียบร้อย!</p>
+        <p id="overlayMessage"></p>
         <button id="closeOverlayBtn">ตกลง</button>
     </div>
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbxt_8AQRUnV6tGGHntduIcV6QIBtKRwKEBIC0U9lAHsYi7neb7uBN25-y_MfcjePOxe/exec";  // 🔁 แก้ไข URL
+    // ⚠️ เปลี่ยนเป็น URL ของคุณ
+    const API_URL = "https://script.google.com/macros/s/AKfycby3iyWlBumJ75t-fjPiZX56B-ZNCYSiQrswWpucGnpvV-tYggU3ZSVb0KhE1YeZ4C9e/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
     const video = document.getElementById('registerVideo');
+    const canvas = document.getElementById('overlayCanvas');
+    const ctx = canvas.getContext('2d');
     const regNameInput = document.getElementById('regName');
     const regStatusDiv = document.getElementById('regStatus');
     const captureBtn = document.getElementById('captureBtn');
@@ -190,20 +205,27 @@
     const overlayMessage = document.getElementById('overlayMessage');
     const closeOverlayBtn = document.getElementById('closeOverlayBtn');
 
-    function showOverlay(message) {
+    // ตัวแปรสำหรับเก็บหลาย descriptor
+    let capturedDescriptors = [];
+    const REQUIRED_SAMPLES = 3;
+    let isCapturing = false;
+
+    function showOverlay(message, isSuccess = true) {
         overlayMessage.innerText = message;
         overlay.classList.add('active');
     }
+
     function hideOverlay() {
         overlay.classList.remove('active');
     }
+
     closeOverlayBtn.onclick = hideOverlay;
     overlay.onclick = (e) => { if (e.target === overlay) hideOverlay(); };
 
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
             video.srcObject = stream;
             currentStream = stream;
             await video.play();
@@ -213,6 +235,7 @@
             return false;
         }
     }
+
     function stopCamera() {
         if (currentStream) {
             currentStream.getTracks().forEach(track => track.stop());
@@ -228,15 +251,36 @@
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            regStatusDiv.innerText = "✅ กล้องพร้อม, กรอกชื่อแล้วกดบันทึก";
+            regStatusDiv.innerText = "✅ กล้องพร้อม กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บภาพ";
+            startFaceDetectionLoop();
         } catch (err) {
             console.error(err);
             regStatusDiv.innerText = "❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models";
         }
     }
 
-    async function getFaceDescriptor() {
-        if (!modelsLoaded) throw new Error("Model ยังไม่โหลด");
+    // วนลูปวาดกรอบใบหน้าบน canvas
+    async function startFaceDetectionLoop() {
+        if (!modelsLoaded) return;
+        setInterval(async () => {
+            if (video.readyState === 4) {
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks();
+                // ปรับขนาด canvas ให้ตรงกับ video
+                const displaySize = { width: video.videoWidth, height: video.videoHeight };
+                faceapi.matchDimensions(canvas, displaySize);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (detections.length > 0) {
+                    const resized = faceapi.resizeResults(detections, displaySize);
+                    faceapi.draw.drawDetections(canvas, resized);
+                    faceapi.draw.drawFaceLandmarks(canvas, resized);
+                }
+            }
+        }, 100);
+    }
+
+    async function captureSingleDescriptor() {
+        if (!modelsLoaded) throw new Error("Model not ready");
         const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
             .withFaceDescriptor();
@@ -244,63 +288,98 @@
         return detection.descriptor;
     }
 
-    async function registerFace() {
+    function updateButtonCounter() {
+        captureBtn.innerText = `💾 เก็บภาพ (${capturedDescriptors.length}/${REQUIRED_SAMPLES})`;
+    }
+
+    async function handleCapture() {
         const name = regNameInput.value.trim();
         if (!name) {
-            showOverlay("⚠️ กรุณากรอกชื่อก่อนบันทึก");
+            showOverlay("⚠️ กรุณากรอกชื่อก่อน", false);
             return;
         }
         if (!modelsLoaded) {
-            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่");
+            showOverlay("⏳ กำลังโหลดโมเดล กรุณารอสักครู่", false);
             return;
         }
-        regStatusDiv.innerText = "🔍 กำลังตรวจจับใบหน้า...";
-        let descriptor;
+
+        // หากยังไม่เริ่มเก็บ หรือเก็บครบแล้วให้เริ่มใหม่
+        if (!isCapturing) {
+            // เริ่ม session ใหม่
+            capturedDescriptors = [];
+            isCapturing = true;
+            captureBtn.disabled = false;
+            regStatusDiv.innerText = `📸 กำลังเก็บภาพที่ 1/${REQUIRED_SAMPLES} กรุณาหันหน้าตรงกล้อง`;
+            updateButtonCounter();
+        }
+
+        if (capturedDescriptors.length >= REQUIRED_SAMPLES) {
+            // เก็บครบแล้ว -> ส่งข้อมูล
+            await submitRegistration(name);
+            return;
+        }
+
+        // ตรวจจับใบหน้า
+        regStatusDiv.innerText = `🔍 กำลังตรวจจับใบหน้า...`;
         try {
-            descriptor = await getFaceDescriptor();
-        } catch(err) {
-            regStatusDiv.innerText = "⚠️ ข้อผิดพลาด: " + err.message;
-            return;
+            const descriptor = await captureSingleDescriptor();
+            if (!descriptor) {
+                regStatusDiv.innerText = `😕 ไม่พบใบหน้า กรุณาอยู่ในกรอบ (${capturedDescriptors.length}/${REQUIRED_SAMPLES})`;
+                return;
+            }
+
+            capturedDescriptors.push(Array.from(descriptor));
+            const count = capturedDescriptors.length;
+            updateButtonCounter();
+
+            if (count < REQUIRED_SAMPLES) {
+                regStatusDiv.innerText = `✅ เก็บภาพที่ ${count} สำเร็จ! กรุณาขยับศีรษะเล็กน้อยแล้วกดปุ่มอีกครั้ง (${count}/${REQUIRED_SAMPLES})`;
+            } else {
+                regStatusDiv.innerText = `🎉 เก็บภาพครบ ${REQUIRED_SAMPLES} ภาพแล้ว กำลังส่งข้อมูล...`;
+                await submitRegistration(name);
+            }
+        } catch (err) {
+            console.error(err);
+            regStatusDiv.innerText = `⚠️ เกิดข้อผิดพลาด: ${err.message}`;
         }
-        if (!descriptor) {
-            regStatusDiv.innerText = "😕 ไม่พบใบหน้า ให้อยู่ในกรอบแล้วลองใหม่";
-            return;
-        }
-        const descriptorArray = Array.from(descriptor);
-        regStatusDiv.innerText = "📡 กำลังส่งข้อมูล...";
-        
+    }
+
+    async function submitRegistration(name) {
+        captureBtn.disabled = true;
+        regStatusDiv.innerText = "📡 กำลังส่งข้อมูลไปยังเซิร์ฟเวอร์...";
+
         const formData = new URLSearchParams();
         formData.append('action', 'register');
         formData.append('name', name);
-        formData.append('descriptor', JSON.stringify(descriptorArray));
-        
+        // ส่ง descriptors array (หลายภาพ)
+        formData.append('descriptors', JSON.stringify(capturedDescriptors));
+
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData
             });
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success) {
-                    showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
-                    regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
-                    regNameInput.value = "";
-                } else {
-                    showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
-                    regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
-                    regNameInput.value = "";
-                }
-            } else {
-                showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
-                regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
+            const result = await response.json();
+
+            if (result.success) {
+                showOverlay(`✅ ${result.message}`);
+                regStatusDiv.innerText = "✔️ ลงทะเบียนสำเร็จ!";
                 regNameInput.value = "";
+            } else {
+                showOverlay(`❌ ${result.message}`, false);
+                regStatusDiv.innerText = `❌ ล้มเหลว: ${result.message}`;
             }
         } catch (err) {
             console.error(err);
-            showOverlay(`✅ บันทึกใบหน้าเรียบร้อย! (${name})`);
-            regStatusDiv.innerText = "✔️ บันทึกสำเร็จ!";
-            regNameInput.value = "";
+            showOverlay(`❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์`, false);
+            regStatusDiv.innerText = "❌ การเชื่อมต่อล้มเหลว";
+        } finally {
+            // รีเซ็ตสถานะ
+            capturedDescriptors = [];
+            isCapturing = false;
+            captureBtn.disabled = false;
+            updateButtonCounter();
         }
     }
 
@@ -312,9 +391,11 @@
     window.onload = async () => {
         await loadModels();
         await startCamera();
-        captureBtn.onclick = registerFace;
+        captureBtn.onclick = handleCapture;
         document.getElementById('backHomeBtn').onclick = goHome;
+        updateButtonCounter();
     };
+
     window.onbeforeunload = () => stopCamera();
 </script>
 </body>
