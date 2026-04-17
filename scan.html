@@ -167,7 +167,7 @@
 
 <script>
     // ⚠️ เปลี่ยน URL เป็นของคุณ
-    const API_URL = "https://script.google.com/macros/s/AKfycby3iyWlBumJ75t-fjPiZX56B-ZNCYSiQrswWpucGnpvV-tYggU3ZSVb0KhE1YeZ4C9e/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxSZSetzJ9D-ZRaxz9cVCcdUbW3amrNGw4m2HJqqCTKC-12w6PB5xXXaVjWSeuktE5c/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -190,7 +190,6 @@
 
     function hideOverlay() {
         overlay.classList.remove('active');
-        // รีเซ็ตปุ่มหลังจากปิด overlay
         enableScanButton();
     }
 
@@ -338,8 +337,6 @@
             console.error("Login error:", error);
             showOverlay("❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์");
             statusMsg.innerText = "❌ การเชื่อมต่อล้มเหลว";
-        } finally {
-            // ปุ่มจะถูก enable เมื่อปิด overlay
         }
     }
 
