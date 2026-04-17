@@ -43,6 +43,10 @@
             font-weight: bold;
             color: #014361;
             white-space: pre-line;
+            min-height: 85px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .btn-group {
             display: flex;
@@ -90,7 +94,7 @@
 <body>
 <div class="card">
     <h1>🧼 ลงชื่อพ่นฆ่าเชื้อประจำสัปดาห์</h1>
-    <div class="schedule-info" id="scheduleStatus">🔄 กำลังโหลดข้อมูลเวลา...</div>
+    <div class="schedule-info" id="scheduleStatus">⏳ กำลังโหลดข้อมูลเวลา...</div>
     <div class="btn-group">
         <button onclick="location.href='register.html'">📝 ลงทะเบียนใบหน้า</button>
         <button id="scanButton" disabled>✅ ลงชื่อ</button>
@@ -101,13 +105,12 @@
 </div>
 
 <script>
-    // ⚠️ กรุณาเปลี่ยน URL ด้านล่างเป็น URL ของ Web App ที่ deploy แล้ว
+    // ⚠️ เปลี่ยน URL เป็นของคุณ
     const API_URL = "https://script.google.com/macros/s/AKfycbwm_LnuYnfIh9_m4ax3lvFbJXnh-XXb67j85NGRlt1ZQP1nm13xXrItIwKicM4mmnd6/exec";
 
     const scheduleDiv = document.getElementById('scheduleStatus');
     const scanButton = document.getElementById('scanButton');
 
-    // ฟังก์ชันสำหรับอัปเดต UI ตามสถานะ canSign
     function updateUIFromSchedule(canSign, message) {
         scheduleDiv.innerText = message;
         if (canSign) {
@@ -138,15 +141,16 @@
         }
     }
 
-    // เมื่อคลิกปุ่มลงชื่อ (จะทำงานเฉพาะเมื่อ enabled)
     scanButton.addEventListener('click', () => {
-        location.href = 'scan.html';
+        if (!scanButton.disabled) {
+            location.href = 'scan.html';
+        }
     });
 
-    // โหลดสถานะครั้งแรก
-    window.onload = loadScheduleStatus;
+    // เรียกทันทีเมื่อ script โหลดเสร็จ
+    loadScheduleStatus();
 
-    // (ตัวเลือก) รีเฟรชสถานะทุกๆ 30 วินาที เผื่อเวลาเปลี่ยนผ่าน
+    // รีเฟรชทุก 30 วินาที
     setInterval(loadScheduleStatus, 30000);
 </script>
 </body>
