@@ -26,22 +26,21 @@
             background: white;
             border-radius: 36px;
             overflow: hidden;
-            padding: 20px;
+            padding: 8px 20px 20px 20px;  /* ลด padding-top จาก 20px เป็น 8px (ประมาณ 1/3) */
             box-shadow: 0 20px 35px rgba(0,0,0,0.3);
         }
         h2 {
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;  /* ลด margin-bottom เพื่อชิดกับ status */
             color: #1e293b;
         }
-        .status-top {
+        .status {
             background: #e6f7ff;
-            padding: 12px;
+            padding: 10px 12px;
             border-radius: 28px;
-            margin-bottom: 16px;
+            margin-bottom: 16px;  /* เพิ่มระยะห่างจาก video */
             text-align: center;
-            font-size: 0.95rem;
-            font-weight: 500;
+            font-size: 0.9rem;
             color: #014361;
         }
         .video-wrapper {
@@ -51,8 +50,8 @@
             overflow: hidden;
             margin-bottom: 20px;
             width: 100%;
-            aspect-ratio: 1 / 1; /* สี่เหลี่ยมจัตุรัส */
-            max-height: 60vh;
+            height: 58vh;
+            min-height: 300px;
         }
         video {
             width: 100%;
@@ -150,18 +149,31 @@
             min-width: 120px;
             cursor: pointer;
         }
+        .counter-badge {
+            display: inline-block;
+            background: #2c7da0;
+            color: white;
+            border-radius: 20px;
+            padding: 4px 12px;
+            margin-left: 8px;
+            font-size: 0.9rem;
+        }
+        @media (max-width: 550px) {
+            .container { padding: 6px 16px 16px 16px; }
+            h2 { margin-bottom: 4px; }
+            .video-wrapper { height: 52vh; }
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h2>📸 ลงทะเบียนใบหน้า</h2>
-    <!-- ย้ายสถานะมาไว้ด้านบน -->
-    <div id="regStatus" class="status-top">📷 กำลังเตรียมกล้องและโหลดโมเดล...</div>
+    <!-- ย้ายสถานะมาไว้ตรงนี้ (ใต้หัวข้อ) -->
+    <div id="regStatus" class="status">📷 กำลังเริ่มต้นกล้อง...</div>
     
     <div class="video-wrapper">
         <video id="registerVideo" autoplay muted playsinline></video>
     </div>
-    
     <input type="text" id="regName" placeholder="ชื่อ-นามสกุล" autocomplete="off">
     <button id="captureBtn">💾 เริ่มเก็บภาพ (0/3)</button>
     <div class="btn-group">
@@ -209,12 +221,12 @@
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
-            // ใช้ ideal เพื่อความเร็ว
+            // ใช้ ideal resolution เพื่อความเร็ว (เหมือน scan.html)
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: "user",
                     width: { ideal: 640 },
-                    height: { ideal: 640 }  // สี่เหลี่ยม
+                    height: { ideal: 480 }
                 } 
             });
             video.srcObject = stream;
@@ -244,11 +256,10 @@
                 faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
             ]);
             modelsLoaded = true;
-            return true;
+            regStatusDiv.innerText = "✅ กล้องพร้อม กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บภาพ";
         } catch (err) {
             console.error(err);
             regStatusDiv.innerText = "❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models";
-            return false;
         }
     }
 
@@ -356,16 +367,10 @@
     }
 
     window.onload = async () => {
-        // โหลดโมเดลและเปิดกล้องพร้อมกัน
+        // เปิดกล้องและโหลดโมเดลพร้อมกันเพื่อความเร็ว
         const modelPromise = loadModels();
         const cameraPromise = startCamera();
-        const results = await Promise.all([modelPromise, cameraPromise]);
-        
-        if (results[0] && results[1]) {
-            regStatusDiv.innerText = "✅ กล้องพร้อม กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บภาพ";
-        } else {
-            regStatusDiv.innerText = "⚠️ เกิดปัญหาในการเริ่มต้น กรุณารีเฟรชหน้า";
-        }
+        await Promise.all([modelPromise, cameraPromise]);
         
         captureBtn.onclick = handleCapture;
         document.getElementById('backHomeBtn').onclick = goHome;
