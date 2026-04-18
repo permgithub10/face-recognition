@@ -31,8 +31,18 @@
         }
         h2 {
             text-align: center;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             color: #1e293b;
+        }
+        .status-top {
+            background: #e6f7ff;
+            padding: 12px;
+            border-radius: 28px;
+            margin-bottom: 16px;
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #014361;
         }
         .video-wrapper {
             position: relative;
@@ -41,8 +51,8 @@
             overflow: hidden;
             margin-bottom: 20px;
             width: 100%;
-            height: 58vh;
-            min-height: 300px;
+            aspect-ratio: 1 / 1; /* สี่เหลี่ยมจัตุรัส */
+            max-height: 60vh;
         }
         video {
             width: 100%;
@@ -84,14 +94,6 @@
         }
         button.secondary {
             background: #475569;
-        }
-        .status {
-            background: #e6f7ff;
-            padding: 12px;
-            border-radius: 28px;
-            margin-top: 12px;
-            text-align: center;
-            font-size: 0.9rem;
         }
         .btn-group {
             display: flex;
@@ -153,15 +155,18 @@
 <body>
 <div class="container">
     <h2>📸 ลงทะเบียนใบหน้า</h2>
+    <!-- ย้ายสถานะมาไว้ด้านบน -->
+    <div id="regStatus" class="status-top">📷 กำลังเตรียมกล้องและโหลดโมเดล...</div>
+    
     <div class="video-wrapper">
         <video id="registerVideo" autoplay muted playsinline></video>
     </div>
+    
     <input type="text" id="regName" placeholder="ชื่อ-นามสกุล" autocomplete="off">
     <button id="captureBtn">💾 เริ่มเก็บภาพ (0/3)</button>
     <div class="btn-group">
         <button id="backHomeBtn" class="secondary">◀ กลับหน้าแรก</button>
     </div>
-    <div id="regStatus" class="status">📷 กำลังเริ่มต้นกล้องและโหลดโมเดล...</div>
 </div>
 
 <div id="successOverlay" class="overlay">
@@ -172,7 +177,7 @@
 </div>
 
 <script>
-    // ⚠️ เปลี่ยน URL เป็นของคุณ
+    // ⚠️ เปลี่ยนเป็น URL ของคุณ
     const API_URL = "https://script.google.com/macros/s/AKfycbwm_LnuYnfIh9_m4ax3lvFbJXnh-XXb67j85NGRlt1ZQP1nm13xXrItIwKicM4mmnd6/exec";
 
     let modelsLoaded = false;
@@ -204,11 +209,12 @@
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
+            // ใช้ ideal เพื่อความเร็ว
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: "user",
                     width: { ideal: 640 },
-                    height: { ideal: 480 }
+                    height: { ideal: 640 }  // สี่เหลี่ยม
                 } 
             });
             video.srcObject = stream;
@@ -350,17 +356,15 @@
     }
 
     window.onload = async () => {
-        regStatusDiv.innerText = "⏳ กำลังโหลดโมเดลและเปิดกล้อง...";
-        
-        // เริ่มทั้งสองงานพร้อมกัน
+        // โหลดโมเดลและเปิดกล้องพร้อมกัน
         const modelPromise = loadModels();
         const cameraPromise = startCamera();
-        const [modelOk, cameraOk] = await Promise.all([modelPromise, cameraPromise]);
+        const results = await Promise.all([modelPromise, cameraPromise]);
         
-        if (modelOk && cameraOk) {
+        if (results[0] && results[1]) {
             regStatusDiv.innerText = "✅ กล้องพร้อม กรอกชื่อแล้วกดปุ่มเพื่อเริ่มเก็บภาพ";
         } else {
-            regStatusDiv.innerText = "❌ การเริ่มต้นล้มเหลว โปรดรีเฟรชหน้า";
+            regStatusDiv.innerText = "⚠️ เกิดปัญหาในการเริ่มต้น กรุณารีเฟรชหน้า";
         }
         
         captureBtn.onclick = handleCapture;
