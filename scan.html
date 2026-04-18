@@ -26,29 +26,21 @@
             background: white;
             border-radius: 36px;
             overflow: hidden;
-            padding: 5px 20px 20px 20px;  
+            padding: 4px 20px 20px 20px;  /* ลด padding-top จาก 20px/8px เหลือ 4px */
             box-shadow: 0 20px 35px rgba(0,0,0,0.3);
         }
         h2 {
             text-align: center;
-            margin-bottom: 6px;  /* ลด margin-bottom เพื่อชิดกับ status */
+            margin-bottom: 6px;
+            margin-top: 4px;  /* เพิ่ม margin-top เล็กน้อยให้ไม่ติดขอบเกินไป */
             color: #1e293b;
-        }
-        .status-message {
-            background: #e6f7ff;
-            padding: 10px 12px;
-            border-radius: 28px;
-            margin-bottom: 16px;  /* เพิ่มระยะห่างจาก video */
-            text-align: center;
-            font-size: 0.9rem;
-            color: #014361;
         }
         .video-wrapper {
             position: relative;
             background: #000;
             border-radius: 28px;
             overflow: hidden;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             width: 100%;
             height: 62vh;
             min-height: 320px;
@@ -135,9 +127,15 @@
             min-width: 120px;
             cursor: pointer;
         }
+        .status-message {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #334155;
+        }
         @media (max-width: 550px) {
-            .container { padding: 6px 16px 16px 16px; }
-            h2 { margin-bottom: 4px; }
+            .container { padding: 2px 16px 16px 16px; }
+            h2 { margin-top: 2px; margin-bottom: 4px; }
             .video-wrapper { height: 55vh; }
         }
     </style>
@@ -145,14 +143,12 @@
 <body>
 <div class="container">
     <h2>✅ ลงชื่อพ่นฆ่าเชื้อ</h2>
-    <!-- ย้ายสถานะมาไว้ตรงนี้ (ใต้หัวข้อ) -->
-    <div id="statusMsg" class="status-message">📷 กำลังเริ่มต้นกล้อง...</div>
-    
     <div class="video-wrapper">
         <video id="scanVideo" autoplay muted playsinline></video>
     </div>
     <button id="startScanBtn">🚀 เริ่มสแกนใบหน้า</button>
     <button id="backHomeBtn" class="secondary">◀ กลับหน้าแรก</button>
+    <div id="statusMsg" class="status-message"></div>
 </div>
 
 <div id="resultOverlay" class="overlay">
@@ -203,7 +199,6 @@
     async function startCamera() {
         if (currentStream) stopCamera();
         try {
-            // ใช้ ideal resolution เพื่อความเร็ว
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: "user",
@@ -217,7 +212,7 @@
             return true;
         } catch (err) {
             console.error(err);
-            statusMsg.innerText = "❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง";
+            showOverlay("❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง");
             return false;
         }
     }
@@ -233,7 +228,6 @@
     async function loadModels() {
         const MODEL_URL = './models';
         try {
-            // โหลดโมเดลแบบขนานเพื่อความเร็ว
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                 faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -243,7 +237,7 @@
             statusMsg.innerText = "✅ กล้องพร้อม กดปุ่มเพื่อสแกน";
         } catch (err) {
             console.error(err);
-            statusMsg.innerText = "❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models";
+            showOverlay("❌ โหลดโมเดลไม่สำเร็จ ตรวจสอบโฟลเดอร์ /models");
         }
     }
 
@@ -309,7 +303,6 @@
     }
 
     window.onload = async () => {
-        // เปิดกล้องและโหลดโมเดลพร้อมกันเพื่อความเร็ว
         const modelPromise = loadModels();
         const cameraPromise = startCamera();
         await Promise.all([modelPromise, cameraPromise]);
