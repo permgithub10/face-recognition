@@ -6,11 +6,7 @@
     <title>ลงชื่อพ่นฆ่าเชื้อ</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, sans-serif;
             background: #0f172a;
@@ -26,12 +22,12 @@
             background: white;
             border-radius: 36px;
             overflow: hidden;
-            padding: 8px 20px 20px 20px;  /* ลด padding-top จากเดิม 20px เหลือ 8px */
+            padding: 8px 20px 20px 20px;
             box-shadow: 0 20px 35px rgba(0,0,0,0.3);
         }
         h2 {
             text-align: center;
-            margin-bottom: 6px;  /* ลดระยะห่างจาก status */
+            margin-bottom: 6px;
             color: #1e293b;
         }
         .status-message {
@@ -72,24 +68,12 @@
             margin-top: 12px;
             transition: 0.2s;
         }
-        button:active {
-            transform: scale(0.97);
-        }
-        button.secondary {
-            background: #475569;
-            margin-top: 8px;
-        }
-        button:disabled {
-            background: #94a3b8;
-            transform: none;
-            cursor: not-allowed;
-        }
+        button:active { transform: scale(0.97); }
+        button.secondary { background: #475569; margin-top: 8px; }
+        button:disabled { background: #94a3b8; transform: none; cursor: not-allowed; }
         .overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.7);
             backdrop-filter: blur(4px);
             display: flex;
@@ -100,10 +84,7 @@
             opacity: 0;
             transition: visibility 0s, opacity 0.3s ease;
         }
-        .overlay.active {
-            visibility: visible;
-            opacity: 1;
-        }
+        .overlay.active { visibility: visible; opacity: 1; }
         .overlay-content {
             background: white;
             max-width: 280px;
@@ -118,11 +99,7 @@
             from { transform: translateY(30px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-        .overlay-content p {
-            font-size: 1.2rem;
-            margin-bottom: 24px;
-            color: #1e293b;
-        }
+        .overlay-content p { font-size: 1.2rem; margin-bottom: 24px; color: #1e293b; }
         .overlay-content button {
             background: #2c7da0;
             border: none;
@@ -145,7 +122,6 @@
 <body>
 <div class="container">
     <h2>✅ ลงชื่อพ่นฆ่าเชื้อ</h2>
-    <!-- ย้าย status มาตรงนี้ ใต้หัวข้อ -->
     <div id="statusMsg" class="status-message">📷 กำลังเริ่มต้นกล้อง...</div>
     
     <div class="video-wrapper">
@@ -163,8 +139,8 @@
 </div>
 
 <script>
-    // ⚠️ เปลี่ยน URL เป็นของคุณ
-    const API_URL = "https://script.google.com/macros/s/AKfycbxxzUzzHiB-IWHGyt-XKnLr1vo60PRNQ5nKpPPQcqRT6Fxe-6GLCOXNSJKhqC4qItcJ/exec";
+    // ⚠️ เปลี่ยนเป็น URL ล่าสุดหลังจาก Deploy
+    const API_URL = "https://script.google.com/macros/s/AKfycbwKB7LvzmCS7eDtM_Eg6cKzQqsOpP4zn5LIsyE3bJ_2YcEH1Fkn-kgMpRMoAa0ivzs1/exec";
 
     let modelsLoaded = false;
     let currentStream = null;
@@ -284,19 +260,28 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData
             });
+            
+            // ✅ ตรวจสอบว่า response เป็น JSON หรือไม่
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text);
+                throw new Error('Server returned non-JSON response');
+            }
+            
             const result = await response.json();
-
+            
             if (result.success) {
                 const successMessage = result.name ? `คุณ ${result.name} ลงชื่อสำเร็จ` : `✅ ลงชื่อสำเร็จ!`;
                 showOverlay(`✅ ${successMessage}`);
                 statusMsg.innerText = `✅ ${successMessage}`;
             } else {
-                showOverlay(`❌ ${result.message}`);
-                statusMsg.innerText = `❌ ${result.message}`;
+                showOverlay(`❌ ${result.message || 'เกิดข้อผิดพลาด'}`);
+                statusMsg.innerText = `❌ ${result.message || 'เกิดข้อผิดพลาด'}`;
             }
         } catch (error) {
             console.error("Login error:", error);
-            showOverlay("❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์");
+            showOverlay("❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ หรือข้อมูลตอบกลับไม่ถูกต้อง");
             statusMsg.innerText = "❌ การเชื่อมต่อล้มเหลว";
         }
     }
