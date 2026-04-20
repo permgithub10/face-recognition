@@ -106,21 +106,43 @@
 
 <script>
     // ⚠️ เปลี่ยน URL เป็นของคุณ
-    const API_URL = "https://script.google.com/macros/s/AKfycbxWplTO5UY7h6o1fmTPNnzFWWnzlHDcBq7KtzkDAVO9OAFtOnsorkYF76zbECMIVLtD/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwe-7XBD_uYvzowY40A4ovM-mdW9wFTLZAUuv3auXPsf0lguJgDGvYS2Tf42NY8BA/exec";
 
     const scheduleDiv = document.getElementById('scheduleStatus');
     const scanButton = document.getElementById('scanButton');
 
-    function updateUIFromSchedule(canSign, message) {
-        scheduleDiv.innerText = message;
+    function updateUIFromSchedule(data) {
+        // data ประกอบด้วย: canSign, message, currentCount, maxPeople, isFull
+        let message = data.message || '';
+        const canSign = data.canSign || false;
+        const currentCount = data.currentCount || 0;
+        const maxPeople = data.maxPeople || 8;
+        const isFull = data.isFull || false;
+        
+        // สร้างข้อความแสดงสถานะ
+        let displayMessage = message;
+        if (canSign && !isFull) {
+            displayMessage += `\n👥 ลงชื่อแล้ว ${currentCount}/${maxPeople} คน`;
+        }
+        scheduleDiv.innerText = displayMessage;
+        
+        // จัดการปุ่ม "ลงชื่อ"
         if (canSign) {
+            scanButton.disabled = false;
+            scanButton.innerText = '✅ ลงชื่อ';
             scheduleDiv.style.backgroundColor = "#d4edda";
             scheduleDiv.style.color = "#155724";
-            scanButton.disabled = false;
         } else {
-            scheduleDiv.style.backgroundColor = "#fff3cd";
-            scheduleDiv.style.color = "#856404";
             scanButton.disabled = true;
+            if (isFull) {
+                scanButton.innerText = `🔒 มีคนลงชื่อครบ ${maxPeople} คนแล้ว`;
+                scheduleDiv.style.backgroundColor = "#e2e3e5";
+                scheduleDiv.style.color = "#41464b";
+            } else {
+                scanButton.innerText = '✅ ลงชื่อ';
+                scheduleDiv.style.backgroundColor = "#fff3cd";
+                scheduleDiv.style.color = "#856404";
+            }
         }
     }
 
@@ -129,7 +151,7 @@
             const response = await fetch(`${API_URL}?action=getScheduleStatus`);
             const result = await response.json();
             if (result.success && result.canSign !== undefined) {
-                updateUIFromSchedule(result.canSign, result.message);
+                updateUIFromSchedule(result);
             } else {
                 scheduleDiv.innerText = "❌ ไม่สามารถโหลดข้อมูลเวลาได้";
                 scanButton.disabled = true;
